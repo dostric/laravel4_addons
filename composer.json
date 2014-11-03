@@ -2,7 +2,7 @@
     "name": "dostric/laravel4_addons",
     "type": "library",
     "description": "Laravel 4 addons.",
-    "keywords": ["laravel", "oauth2"],
+    "keywords": ["laravel"],
     "require": {
         "laravel/framework": "~4"
     }
