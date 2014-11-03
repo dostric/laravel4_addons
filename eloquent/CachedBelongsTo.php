@@ -13,21 +13,17 @@ class CachedBelongsTo extends BelongsTo {
      */
     public function getResults()
     {
-
         $model = $this->query->getModel();
 
-        if ($model instanceof EloquentPlus) {
-
-            if ($model->isSmallTable()) {
-
+        if ($model instanceof EloquentPlus)
+        {
+            if ($model->isSmallTable())
+            {
                 return $model->all()->get($this->parent->{$this->foreignKey});
-
             }
-
         }
 
         return $this->query->first();
-
     }
 
 
@@ -35,22 +31,19 @@ class CachedBelongsTo extends BelongsTo {
      * @param array $columns
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function get($columns = array('*')) {
-
+    public function get($columns = array('*'))
+    {
         $model = $this->query->getModel();
 
-        if ($model instanceof EloquentPlus) {
-
-            if ($model->isSmallTable()) {
-
-                return $model->all();
-
+        if ($model instanceof EloquentPlus)
+        {
+            if ($model->isSmallTable())
+            {
+                return $model->all($columns);
             }
-
         }
 
         return $this->query->get($columns);
-
     }
 
 
@@ -84,7 +77,8 @@ class CachedBelongsTo extends BelongsTo {
         // the primary key of the children to map them onto the correct instances.
         foreach ($models as $model)
         {
-            if ($results->has($fId = $model->$foreign)) {
+            if ($results->has($fId = $model->$foreign))
+            {
                 $model->setRelation($relation, $results->get($fId));
             }
         }

@@ -10,11 +10,12 @@ class DbTools {
     public static $sqlTotalRows;
 
 
-    public static function dataMap($type, $items, $valueCol, $labelCol, $addItem = false) {
-
+    public static function dataMap($type, $items, $valueCol, $labelCol, $addItem = false)
+    {
         $result = array();
 
-        foreach($items as $xx => $item) {
+        foreach($items as $xx => $item)
+        {
             if (is_object($item)) $item = (array)$item;
             $result[] = array(
                 'value' => $item[$valueCol],
@@ -24,7 +25,6 @@ class DbTools {
         }
 
         return $result;
-
     }
 
 
@@ -77,20 +77,32 @@ class DbTools {
      * @param $table
      * @return \Doctrine\DBAL\Schema\Column[]
      */
-    public static function getTableSchema($table) {
+    public static function getTableSchema($table, $fresh = false) {
 
         $cacheKey = 'table_schema_'.$table;
 
-        if ( !Config::get('app.debug') && Cache::has($cacheKey) ) {
+        if ($fresh)
+        {
+            Cache::forget($cacheKey);
+        }
+
+        if ( !Config::get('app.debug') && Cache::has($cacheKey) )
+        {
             return Cache::get($cacheKey);
         }
 
-        $tableColumns =
+        $tableColumns = array();
+
+        array_map(
+            function ($item) use (&$tableColumns) {
+                $tableColumns[$item->getName()] = $item;
+            },
             DB::connection()
                 ->getDoctrineSchemaManager()
                 ->listTableColumns(
                     $table
-                );
+                )
+        );
 
         Cache::put($cacheKey, $tableColumns, 60);
 
@@ -104,19 +116,26 @@ class DbTools {
      * @param $table
      * @return array
      */
-    public static function getFormSchema($table) {
-
+    public static function getFormSchema($table, $fresh = false)
+    {
         $cacheKey = 'table_form_schema_'.$table;
 
-        if ( !Config::get('app.debug') && Cache::has($cacheKey) )  {
+        if ($fresh)
+        {
+            Cache::forget($cacheKey);
+        }
+
+        if ( !Config::get('app.debug') && Cache::has($cacheKey) )
+        {
             return Cache::get($cacheKey);
         }
 
-        $objSchema = static::getTableSchema($table); //var_dump($objSchema);
+        $objSchema = static::getTableSchema($table);
 
         $schema = array();
 
-        foreach($objSchema as $k => $item) {
+        foreach($objSchema as $k => $item)
+        {
             $item = $item->toArray();
             $item['type'] = $item['type']->getName();
             $schema[$item['name']] = $item;
@@ -145,51 +164,38 @@ class DbTools {
      *
      * @return \Doctrine\DBAL\Schema\ForeignKeyConstraint[]
      */
-    public static function getTableKeys($table) {
-
+    public static function getTableKeys($table)
+    {
         return DB::getDoctrineSchemaManager()
             ->listTableDetails($table)
             ->getForeignKeys();
-        //->getIndexes();
-        /*
-                $results = DB::select("
-                    SELECT
-                        `column_name`,
-                        `referenced_table_schema` AS foreign_db,
-                        `referenced_table_name` AS foreign_table,
-                        `referenced_column_name`  AS foreign_column
-                    FROM
-                        `information_schema`.`KEY_COLUMN_USAGE`
-                    WHERE
-                        `constraint_schema` = SCHEMA()
-                    AND
-                        `table_name` = ?
-                    AND
-                        `referenced_column_name` IS NOT NULL
-                    ORDER BY
-                        `column_name`;", array($table));
-
-                return $results;
-        */
     }
 
 
     /**
      * @param $table
-     * @return array
+     * @param bool $fresh
      * @throws \Exception
+     * @return array
      */
-    public static function fKeys($table) {
-
+    public static function fKeys($table, $fresh = false)
+    {
         $cacheKey = 'table_fkeys_'.$table;
+
+        if ($fresh)
+        {
+            \Cache::forget($cacheKey);
+        }
+
         $cacheData = Cache::has($cacheKey) ? Cache::get($cacheKey) : array(); //var_dump($cacheData);
 
-        if (array_key_exists($table, $cacheData)) {
+        if (array_key_exists($table, $cacheData))
+        {
             return $cacheData[$table];
         }
 
-        foreach(static::getTableKeys($table) as $key => $data) {
-
+        foreach(static::getTableKeys($table) as $key => $data)
+        {
             if (
                 count($local = $data->getLocalColumns()) >1 ||
                 count($foreign = $data->getForeignColumns()) >1
@@ -200,60 +206,48 @@ class DbTools {
             list($local) = $local;
             list($foreign) = $foreign;
 
-            if (!array_key_exists($table, $cacheData)) {
+            if (!array_key_exists($table, $cacheData))
+            {
                 $cacheData[$table] = array();
             }
-            if (!array_key_exists($local, $cacheData[$table])) {
+
+            if (!array_key_exists($local, $cacheData[$table]))
+            {
                 $cacheData[$table][$local] = (object)array(
                     'table'     => $data->getForeignTableName(),
                     'column'    => $foreign
                 );
             }
 
-            /*
-
-            echo "<pre>".
-
-            $data->getLocalTableName().".".implode(',', $data->getColumns()) .
-                " ==(referencing)== ".
-            $data->getForeignTableName().'.'.implode(',', $data->getForeignColumns())."
-
-            </pre>";
-            */
-
-            //var_dump($cacheData);
-
         }
-
-        //var_dump($cacheData);
-        //exit();
 
         Cache::put($cacheKey, $cacheData, 70);
 
         return array_key_exists($table, $cacheData) ? $cacheData[$table] : array();
-
     }
 
 
-    public static function getTotalRecords($resetTotal = false) {
+    public static function getTotalRecords($resetTotal = false)
+    {
         if ($resetTotal) static::$sqlTotalRows = null;
         return DB::select('SELECT FOUND_ROWS() as total')[0]->total;
     }
 
 
     // \Illuminate\Database\Eloquent\Model
-    public static function paginate($query, $page = 1, $perPage = 10) {
-
-        if (str_contains($page, ':')) {
+    public static function paginate($query, $page = 1, $perPage = 10)
+    {
+        if (str_contains($page, ':'))
+        {
             list($page, $perPage) = explode(':', $page);
         }
 
-        if (Tools::is_pdigit($page) && Tools::is_pdigit($perPage)) {
+        if (Tools::is_pdigit($page) && Tools::is_pdigit($perPage))
+        {
             $query = $query->forPage($page, $perPage);
         }
 
         return $query;
-
     }
 
 
@@ -288,7 +282,8 @@ class DbTools {
 
 
     // \Illuminate\Database\Eloquent\Builder
-    public static function orderBy($query, $orderBy, $direction = 'ASC') {
+    public static function orderBy($query, $orderBy, $direction = 'ASC')
+    {
 
         if (str_contains($orderBy, ':')) {
 
@@ -391,5 +386,30 @@ class DbTools {
 
     }
 
+
+
+    public static function detectModelClass($model)
+    {
+        foreach([
+            'lib/cms/models' => '\Cms\Models'
+        ] as $folder => $namespace)
+        {
+            $className = studly_case($model);
+            $path = app_path($folder . '/' . $className . '.php');
+
+            if (\File::exists($path))
+            {
+                return $namespace . '\\'.$className;
+            }
+        }
+
+        return null;
+    }
+
+
+    public static function detectModelClassByTable($table)
+    {
+        return static::detectModelClass(str_singular($table));
+    }
 
 }

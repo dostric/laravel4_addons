@@ -5,16 +5,25 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Input;
 use \Cache;
 use \DB;
+use LaravelAddons\Util\Tools;
 use \Session;
 use LaravelAddons\Util\DbTools;
 
-
+/*
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/dostric/laravel4_addons.git"
+        }
+    ],
+*/
 class EloquentPlus extends \Eloquent {
 
 
-    protected $storeCollectionByPK = true;
+    protected $hidden = array('created_at', 'updated_at');
 
-    public static $smallTableRows = 500;
+
+    public $smallTableRows = 500;
 
     protected static $rememberMinutes = 500;
 
@@ -25,6 +34,17 @@ class EloquentPlus extends \Eloquent {
 
 
     public $columnSearchTerm = null;
+
+    // store models in collection by primary key
+    public $storeCollectionByPK = true;
+
+    // the key for storing models into collection
+    public $modelStoreKey = null;
+
+
+
+    // related child models
+    protected static $related = array();
 
 
     /**
@@ -45,18 +65,65 @@ class EloquentPlus extends \Eloquent {
 
 
 
-    public static function factory() {
+
+    public static function make()
+    {
         return new static();
     }
 
 
+    /**
+     * Helper for getting the model id.
+     *
+     * @return mixed
+     * @throws \Exception
+     */
+    public function getId()
+    {
+        if ($this->exists)
+        {
+            return $this->{$this->primaryKey};
+        }
+        throw new \Exception('Error fetching model id - model is not loaded!');
+    }
 
-    public function isSmallTable() {
-        return $this->smallTable && (self::cachedCount() < self::$smallTableRows);
+    /**
+     * Helper for getting the model representation value (used in grids).
+     *
+     * @return mixed
+     * @throws \Exception
+     */
+    public function getTitle()
+    {
+        if ($this->exists)
+        {
+            $lang = \App::getLocale();
+            $attr = $this->getAttributes();
+            if (array_key_exists('name_'.$lang, $attr))
+            {
+                return $attr['name_'.$lang];
+            }
+            elseif (array_key_exists('name', $attr))
+            {
+                return $attr['name'];
+            }
+            return null;
+        }
+        throw new \Exception('Error fetching model title - model is not loaded!');
     }
 
 
+    public function isSmallTable()
+    {
+        return $this->smallTable && (self::cachedCount() < $this->smallTableRows);
+    }
 
+    public static function onMaster($name = null)
+    {
+        return static::on(
+            $name ?: \Config::get('database.default-master')
+        );
+    }
 
     /**
      * Adding support for generating model collections using the primary key as collection key.
@@ -64,22 +131,28 @@ class EloquentPlus extends \Eloquent {
      * @param \Illuminate\Database\Eloquent\Model[] $models
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function newCollection(array $models = array()) {
-
-        if ($this->storeCollectionByPK) {
-
+    public function newCollection(array $models = array())
+    {
+        if ($this->storeCollectionByPK && count($models))
+        {
             $coll = new \Illuminate\Database\Eloquent\Collection();
 
-            foreach($models as $model) {
-                $coll->put($model->{$model->getKeyName()}, $model);
+            $mKey = current($models);
+            if ($mKey)
+            {
+                // use the defined key or get the primary key by default
+                $mKey = $this->modelStoreKey ?: $mKey->getKeyName();
+                foreach($models as $model)
+                {
+                    $coll->put($model->{$mKey}, $model);
+                }
+            } else {
+                //echo "Nema modela?<br>\n";
             }
 
         } else {
-
             $coll = new \Illuminate\Database\Eloquent\Collection($models);
-
         }
-
 
         return $coll;
 
@@ -89,45 +162,63 @@ class EloquentPlus extends \Eloquent {
      * Retrieve the table schema. It is a non-cached version, object based.
      * @return \Doctrine\DBAL\Schema\Column[]
      */
-    public static function getTableSchema() {
-
+    public static function getTableSchema()
+    {
         return DbTools::getTableSchema(static::getModel()->getTable());
     }
 
 
-    public static function getFormSchema() {
-
+    /**
+     * @return array
+     */
+    public static function getFormSchema()
+    {
         return DbTools::getFormSchema(static::getModel()->getTable());
     }
 
 
-    public static function cachedCount($force = false) {
+    /**
+     * Retrieves the table item count.
+     * Uses the master connection for accuracy
+     *
+     * @param bool $force
+     * @return int
+     */
+    public static function cachedCount($force = false)
+    {
+        static $cache;
 
-        static $countCached;
+        // global count cache
+        $keyGlobal = 'cache_table_counts';
 
+        // the cache key of the current table
         $key = static::cacheCountKey();
 
-        if ($force) {
-            $countCached = null;
+        // check if we already loaded the cache if not get it; default is empty array
+        $cache = isset($cache) ? $cache : Cache::get($keyGlobal, array());
+
+        // remove the element from cache?
+        if ($force)
+        {
+            unset($cache[$key]);
         }
 
-        if (!$countCached) {
-
-            if (Cache::has($key) && Tools::is_digit($countCached = Cache::get($key))) {
-
-
-
-            } else {
-
-                $countCached = static::count();
-                Cache::put($key, $countCached, 24*12);
-
-            }
-
+        if ( !isset($cache[$key]) )
+        {
+            // we`ll use the new count from the master
+            // if we performed some affecting query the
+            // state on slave is not replicated immediately
+            $cache[$key] = static::onMaster()->count();
+            Cache::put($keyGlobal, $cache, 24*60);
         }
 
-        return $countCached;
+        return $cache[$key];
+    }
 
+
+    public static function count($columns = '*', $fresh = false)
+    {
+        return static::cachedCount($fresh);
     }
 
 
@@ -139,15 +230,15 @@ class EloquentPlus extends \Eloquent {
      * @param string $key
      * @return mixed
      */
-    public function getAttribute($key) {
-
+    public function getAttribute($key)
+    {
         if (array_key_exists($key, $this->relations))
         {
             return $this->relations[$key];
         }
 
-        if (!array_key_exists($key, $this->attributes) && method_exists($this, $key)) {
-
+        if (!array_key_exists($key, $this->attributes) && method_exists($this, $key))
+        {
             $relations = $this->$key();
             if ($relations instanceof Relation) {
                 $relations = $relations->getResults();
@@ -157,25 +248,29 @@ class EloquentPlus extends \Eloquent {
         }
 
         return parent::getAttribute($key);
-
     }
 
 
     /**
-     * Define an cached inverse one-to-one or many relationship.
+     * Define an inverse one-to-one or many relationship.
      *
      * @param  string  $related
      * @param  string  $foreignKey
+     * @param  string  $otherKey
+     * @param  string  $relation
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function cachedBelongsTo($related, $foreignKey = null)
+    public function cachedBelongsTo($related, $foreignKey = null, $otherKey = null, $relation = null)
     {
-        list(, $caller) = debug_backtrace(false);
+        // If no relation name was given, we will use this debug backtrace to extract
+        // the calling method's name and use that as the relationship name as most
+        // of the time this will be what we desire to use for the relationships.
+        if (is_null($relation))
+        {
+            list(, $caller) = debug_backtrace(false);
 
-        // If no foreign key was supplied, we can use a backtrace to guess the proper
-        // foreign key name by using the name of the relationship function, which
-        // when combined with an "_id" should conventionally match the columns.
-        $relation = $caller['function'];
+            $relation = $caller['function'];
+        }
 
         if (is_null($foreignKey))
         {
@@ -189,55 +284,113 @@ class EloquentPlus extends \Eloquent {
 
         $query = $instance->newQuery();
 
-        return new CachedBelongsTo($query, $this, $foreignKey, $relation);
+        $otherKey = $otherKey ?: $instance->getKeyName();
+
+        return new CachedBelongsTo($query, $this, $foreignKey, $otherKey, $relation);
     }
 
 
-    public static function cacheKey() {
-        return 'cached_table_'.get_called_class();
+    /**
+     * Define a one-to-many relationship.
+     *
+     * @param  string  $related
+     * @param  string  $foreignKey
+     * @param  string  $localKey
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function cachedHasMany($related, $foreignKey = null, $localKey = null)
+    {
+        $foreignKey = $foreignKey ?: $this->getForeignKey();
+
+        $instance = new $related;
+
+        $localKey = $localKey ?: $this->getKeyName();
+
+        return new CachedHasMany($instance->newQuery(), $this, $instance->getTable().'.'.$foreignKey, $localKey);
     }
 
-    public static function cacheCountKey() {
-        return self::cacheKey() . '_count';
+
+    public static function cacheKey($entity = null)
+    {
+        return
+            'cached_table_' .
+            str_replace("\\", '_', get_called_class()) .
+            ($entity ? "_$entity" : '');
+    }
+
+
+    public static function cacheCountKey()
+    {
+        // we are storing all the counts in one cache key
+        return 'cache_table_counts'; //self::cacheKey() . '_count';
     }
 
 
     /**
      * Get all of the models from the database.
      *
-     * @param  array  $columns
+     * @param  array $columns
+     * @param bool $fresh
      * @return \Illuminate\Database\Eloquent\Collection|static[]
      */
-    public static function all($columns = array('*')) {
-
-        static $all;
-
-        // if we already evaluated the table we`ll speed up
-        // things by skipping all the further processing.
-        if ($all) return $all;
-
+    public static function all($columns = array('*'), $fresh = false)
+    {
+        /**
+         * @var EloquentPlus $model
+         */
+        $model = new static;
         $key = self::cacheKey();
 
-        if (with(new static)->isSmallTable()) {
+        if ($fresh)
+        {
+            $model->deleteSmallTableCache();
+        }
 
-            Cache::forever($key, $all = parent::all());
-
-            return $all;
-
-            if ($all = Cache::get($key)) {
+        if ($model->isSmallTable())
+        {
+            if ($all = Cache::tags($model->getTable())->get($key))
+            {
                 // we have it in the cache
-            } else {
-                Cache::forever($key, $all = parent::all());
+            }
+            else
+            {
+                // we`ll cache data from master; all columns
+                // cache the version with all columns
+                $all = $model->onMaster()->select()->get();
+
+                \Cache::tags($model->getTable())->forever($key, $all);
+
+
+                // Cache::tags($model->getTable(), $key)->forever($key, $all);
+                /*
+                $all = \Cache::tags($model->getTable(), $key)->rememberForever($key, function() use ($model) {
+                    return $model->onMaster()->select()->get();
+                });
+                */
+
+                // \Cache::put($key, $all, 60*24);
+            }
+
+            // check if we need to select custom columns
+            if ($columns != array('*'))
+            {
+                $columns = array_keys($model->getAttributes());
+                $columns = array_combine($columns, $columns);
+
+                foreach($all as $k => $v)
+                {
+                    $all[$k] = array_intersect_key($v, $columns);
+                }
             }
 
             return $all;
 
         }
 
+        //\Log::info($model->getModel()->getTable() . ' in not a small table');
         return parent::all($columns);
 
     }
-
 
 
     /**
@@ -278,32 +431,40 @@ class EloquentPlus extends \Eloquent {
      *
      * @return array
      */
-    public function queryForItems() {
+    public function queryForItems($defaults = null) {
 
-        $items = array();
+        // the debug state
+        $debug = \Config::get('debug') === true;
+        $lang = \App::getLocale();
 
+        // the return data
+        $result = array();
+
+        // the return errors data
         $errors = array();
 
-        // get table def
-        $localTable = DbTools::getTableSchema($this->getModel()->getTable());
-        $fKeys = DbTools::fKeys(static::getModel()->getTable());
+        // table and fkeys
+        $table = $this->getTable();
+        $foreignKeys = DbTools::fKeys($table);
+
+        $this->setHidden(array('created_at', 'updated_at'));
 
         // check search term
         $searchTerm = $this->columnSearchTerm ? $this->columnSearchTerm : Input::get('search');
 
-        $llarray = array();
-        if ($this->combineTables) {
-
-            foreach($fKeys as $column => $colData) {
-                $llarray[] = $colData->table;
+        $modelWith = array();
+        if ($this->combineTables)
+        {
+            foreach($foreignKeys as $column => $colData)
+            {
+                $modelWith[] = $colData->table;
             }
-
         }
 
         try {
 
             $query = $this
-                ->with($llarray)
+                ->with($modelWith)
                 ->select(array(
                     \DB::raw('SQL_CALC_FOUND_ROWS `' . static::getModel()->getTable() . '`.*')
                 ));
@@ -319,10 +480,11 @@ class EloquentPlus extends \Eloquent {
 
             try {
 
-                $query = $query->get();
+                $data = $query->get();
 
                 // check if we need to manualy get the count
-                if (DbTools::$sqlTotalRows == 'get') {
+                if (DbTools::$sqlTotalRows == 'get')
+                {
                     DbTools::$sqlTotalRows = DbTools::getTotalRecords();
                 }
 
@@ -330,53 +492,66 @@ class EloquentPlus extends \Eloquent {
 
             } catch (\Exception $e) {
 
-                $errors[] = $e->getMessage() . ' Query: '.$query->toSql();
-                $query = array();
+                $data = array();
+
+                $errors[] = $debug ?
+                    'Error fetching data.' :
+                    $e->getMessage() . ' Query: '.$query->toSql();
 
             }
 
-            // do we need foreign tables - speed up search queries foreign table data is not important
-            if ($this->combineTables) {
 
-                $results = array();
+            // do we need foreign tables - speed up search queries if foreign table data is not important
+            if ($this->combineTables)
+            {
 
-                foreach($query as $k => $item) {
+                foreach($data as $k => $item)
+                {
+                    // get just the model attributes
+                    $result[$k] = $item->attributesToArray();
 
-                    $results[$k] = $item->toArray();
+                    foreach($foreignKeys as $column => $colData)
+                    {
+                        if ($item instanceof \Eloquent && ($relatedModel = $item->getRelation($colData->table)))
+                        {
+                            $result[$k][$column] = array(
+                                'title' => $relatedModel->getTitle(),
+                                'id'    => $item->{$column}
+                            );
 
-                    foreach($fKeys as $column => $colData) {
-
-                        if (is_object($item) && isset($item->{$colData->table})) {
-                            $results[$k]['fkvalue_'.$column] = $item->{$colData->table}->name;
-                            unset($results[$k][$colData->table]);
+                            //$result[$k]['fkvalue_'.$column] = $foreignTitle;
+                            //unset($result[$k][$colData->table]);
                         }
 
                     }
 
                 }
 
-                $items = $results;
-
             } else {
 
-                $items = $query->toArray();
+                $result = $data->toArray();
 
             }
 
 
         } catch (\Exception $e) {
 
-            $errors[] = $e->getMessage() . ' at ' . $e->getFile() . ' line ' . $e->getLine();
-            $items = array();
             $total = 0;
+
+            $result = array();
+
+            $errors[] = $debug ?
+                'Error fetching data.' :
+                $e->getMessage() . ' at ' . $e->getFile() . ' line ' . $e->getLine();
 
         }
 
-        if (count($errors)) {
+        if (count($errors))
+        {
             foreach($errors as $err) \Log::error($err);
         }
 
-        return array($items, $total);
+        return array($result, $total);
 
     }
 
@@ -413,63 +588,107 @@ class EloquentPlus extends \Eloquent {
     }
 
 
-    public function update(array $data = array()) {
+    public function update(array $data = array())
+    {
         // we`ll remove all unnecessary data
         return parent::update(self::filterModelKeys($data));
     }
 
 
-    public static function create(array $data) {
+    public static function create(array $data)
+    {
         // we`ll remove all unnecessary data
         return parent::create(self::filterModelKeys($data));
     }
 
 
-    public function save(array $options = array()) {
+    public function delete()
+    {
+        $deleted = self::onMaster()->delete();
+
+        if ($deleted)
+        {
+            $this->deleteSmallTableCache();
+        }
+
+        return $deleted;
+    }
+
+
+    public static function related()
+    {
+        return isset(static::$related) && is_array(static::$related) ? static::$related : array();
+    }
+
+
+    public function save(array $options = array())
+    {
+        // we`ll switch the connection to the master and reset it after the update
+        DB::setDefaultConnection(\Config::get('database.default-master'));
+
+        \Log::info(
+            'model->save() ' . $this->getTable() . ' sa ' . print_r($this->getAttributes(), true)
+        );
 
         $saved = parent::save($options);
-        if ($saved === true) {
+
+        DB::setDefaultConnection(DB::getDefaultConnection());
+
+        if ($saved === true)
+        {
+
+            \Log::info('model->save() call to model->deleteSmallTableCache');
             $this->deleteSmallTableCache();
+
+            \Log::info('model->save() related je: ' . implode(', ', $this->related()));
+            if (true || count($this->related()))
+            {
+                foreach($this->related() as $child)
+                {
+                    \Log::error($child);
+                    static::flushChildren(
+                        $this->getTable(),
+                        with(new $child)->getTable(),
+                        $this->{$this->primaryKey}
+                    );
+                }
+
+            }
         }
 
         return $saved;
     }
 
 
-    public function delete() {
+    public function deleteSmallTableCache()
+    {
+        \Log::info("Delete small table cache za: {$this->getTable()}");
 
-        $deleted = parent::delete();
+        // forget the table count
+        $this->cachedCount(true);
 
-        if ($deleted) {
-            $this->deleteSmallTableCache();
-        }
-
-        return $deleted;
-
+        // forget the data cache
+        Cache::tags($this->getTable())->flush();
     }
 
-    protected function deleteSmallTableCache() {
 
-        $key = static::cacheKey();
-
-        // new if we have it in the cache skip checking - just forget the data
-        if (Cache::has($key)) {  // $this->isSmallTable()
-
-            Tools::printData("Deletam");
-
-            // forget the cached count
-            Cache::forget(static::cacheCountKey());
-            static::cachedCount(true);
-
-            // forget the data cache
-            return Cache::forget($key);
-
-        }
-
-        return false;
-
+    public static function cacheKeyChild($parent, $child, $parentId)
+    {
+        return "cc_{$parent}_{$child}_{$parentId}";
     }
 
+
+    public static function flushChildren($parent, $child, $parentId)
+    {
+        \Cache::tags($child)->flush();
+    }
+
+
+    public static function forgetChild($key)
+    {
+        list(,,$child) = explode('_', $key);
+        \Cache::tags($child)->forget($key);
+    }
 
 }
 
