@@ -481,7 +481,9 @@ class EloquentPlus extends \Eloquent {
             {
                 foreach($defaults as $column => $value)
                 {
-                    $query->where($column, $value);
+                    if (array_key_exists($column, $this->attributes)) {
+                        $query->where($column, $value);
+                    }
                 }
             }
 
