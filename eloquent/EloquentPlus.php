@@ -480,6 +480,9 @@ class EloquentPlus extends \Eloquent {
 
             try {
 
+                /**
+                 * @var \Illuminate\Database\Eloquent\Collection $data
+                 */
                 $data = $query->get();
 
                 // check if we need to manualy get the count
@@ -515,7 +518,7 @@ class EloquentPlus extends \Eloquent {
                         if ($item instanceof \Eloquent && ($relatedModel = $item->getRelation($colData->table)))
                         {
                             $result[$k][$column] = array(
-                                'title' => $relatedModel->getTitle(),
+                                'text' => $relatedModel->getTitle(),
                                 'id'    => $item->{$column}
                             );
 
@@ -532,6 +535,15 @@ class EloquentPlus extends \Eloquent {
                 $result = $data->toArray();
 
             }
+
+            /*
+            if ($data && $data->count()) {
+                $data = array_values($data->toArray());
+            } else {
+                $data = array();
+            }
+            */
+
 
 
         } catch (\Exception $e) {
@@ -551,7 +563,7 @@ class EloquentPlus extends \Eloquent {
             foreach($errors as $err) \Log::error($err);
         }
 
-        return array($result, $total);
+        return array(array_values($result), $total);
 
     }
 
