@@ -1,5 +1,6 @@
 <?php namespace LaravelAddons\Eloquent;
 
+use Doctrine\DBAL\Query\QueryBuilder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Input;
@@ -429,10 +430,11 @@ class EloquentPlus extends \Eloquent {
     /**
      * Performs search query on the model.
      *
+     * @param array $defaults
      * @return array
      */
-    public function queryForItems($defaults = null) {
-
+    public function queryForItems($defaults = null)
+    {
         // the debug state
         $debug = \Config::get('debug') === true;
         $lang = \App::getLocale();
@@ -447,7 +449,7 @@ class EloquentPlus extends \Eloquent {
         $table = $this->getTable();
         $foreignKeys = DbTools::fKeys($table);
 
-        $this->setHidden(array('created_at', 'updated_at'));
+        $this->setHidden(['created_at', 'updated_at']);
 
         // check search term
         $searchTerm = $this->columnSearchTerm ? $this->columnSearchTerm : Input::get('search');
@@ -474,6 +476,15 @@ class EloquentPlus extends \Eloquent {
             $query = DbTools::orderBy($query, Input::get('order_by', null));
             $query = DbTools::columnSearch($query);
 
+            // add the defaults to the query
+            if (is_array($defaults) && count($defaults))
+            {
+                foreach($defaults as $column => $value)
+                {
+                    $query->where($column, $value);
+                }
+            }
+
 
             // set initial counter
             $total = DbTools::$sqlTotalRows = 0;
@@ -481,6 +492,7 @@ class EloquentPlus extends \Eloquent {
             try {
 
                 /**
+                 * @var \Illuminate\Database\Query\Builder $query
                  * @var \Illuminate\Database\Eloquent\Collection $data
                  */
                 $data = $query->get();

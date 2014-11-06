@@ -428,6 +428,12 @@ class FormSchema {
             );
         }
 
+        /**
+         * @var array $gridFields
+         * @var array $editFields
+         * @var array $searchFields
+         */
+
         $out = array();
         foreach($this->schema as $column => $data)
         {
