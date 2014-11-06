@@ -436,7 +436,7 @@ class EloquentPlus extends \Eloquent {
     public function queryForItems($defaults = null)
     {
         // the debug state
-        $debug = \Config::get('debug') === true;
+        $debug = \Config::get('app.debug') === true;
         $lang = \App::getLocale();
 
         // the return data
