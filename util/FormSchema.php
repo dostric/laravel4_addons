@@ -208,7 +208,7 @@ class FormSchema {
         $this->removeFields('searchFields', $fields);
     }
 
-    private function createFormRules($rules = '') {
+    protected function createFormRules($rules = '') {
 
         $newRules = array();
         if ($rules) {
