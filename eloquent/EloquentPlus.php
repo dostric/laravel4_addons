@@ -530,21 +530,12 @@ class EloquentPlus extends \Eloquent {
 
                 }
 
-            } else {
+            }
 
+            else
+            {
                 $result = $data->toArray();
-
             }
-
-            /*
-            if ($data && $data->count()) {
-                $data = array_values($data->toArray());
-            } else {
-                $data = array();
-            }
-            */
-
-
 
         } catch (\Exception $e) {
 
@@ -563,7 +554,7 @@ class EloquentPlus extends \Eloquent {
             foreach($errors as $err) \Log::error($err);
         }
 
-        return array(array_values($result), $total);
+        return array($result, $total);
 
     }
 
