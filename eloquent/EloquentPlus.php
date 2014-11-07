@@ -541,8 +541,9 @@ class EloquentPlus extends \Eloquent {
                     {
                         if ($item instanceof \Eloquent && ($relatedModel = $item->getRelation($colData->table)))
                         {
+                            $relatedTitle = $relatedModel->getTitle();
                             $result[$k][$column] = array(
-                                'text' => $relatedModel->getTitle(),
+                                'text' => $relatedTitle ?: 'Id: ' . $item->{$column},
                                 'id'    => $item->{$column}
                             );
 
