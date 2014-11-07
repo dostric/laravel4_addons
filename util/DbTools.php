@@ -74,7 +74,10 @@ class DbTools {
     }
 
     /**
-     * @param $table
+     * Gets the table schema. By default it is cached.
+     *
+     * @param string $table
+     * @param bool $fresh
      * @return \Doctrine\DBAL\Schema\Column[]
      */
     public static function getTableSchema($table, $fresh = false) {
@@ -157,9 +160,10 @@ class DbTools {
 
     }
 
-//* @return \Doctrine\DBAL\Schema\Index[]
 
     /**
+     * Gets the table foreign keys. Method is not cached.
+     *
      * @param $table
      *
      * @return \Doctrine\DBAL\Schema\ForeignKeyConstraint[]
@@ -173,6 +177,8 @@ class DbTools {
 
 
     /**
+     * Gets the table foreign keys. By default the keys are cached.
+     *
      * @param $table
      * @param bool $fresh
      * @throws \Exception

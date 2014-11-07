@@ -108,6 +108,32 @@ class EloquentPlus extends \Eloquent {
             {
                 return $attr['name'];
             }
+
+            return null;
+
+            if (method_exists($this, 'swiftGetTitle')) {
+                return $this->swiftGetTitle();
+            }
+
+            // try to find the name on the foreign tables
+            $fKeys =  DbTools::fKeys($this->getTable());
+            foreach($fKeys as $key => $data)
+            {
+                $foreignTable = $data->table;
+                $foreignTableStructure = DbTools::getTableSchema($foreignTable);
+                $titleKey =
+                    array_key_exists('name_'.$lang, $foreignTableStructure) ? 'name_'.$lang :
+                        (array_key_exists('name', $foreignTableStructure) ? 'name' : null);
+
+                // if we have the title on the foreign table; get the title
+                if ($titleKey)
+                {
+                    return $this->{$foreignTable}->{$titleKey};
+                }
+
+            }
+
+            // we did not find the name
             return null;
         }
         throw new \Exception('Error fetching model title - model is not loaded!');
