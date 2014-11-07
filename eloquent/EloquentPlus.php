@@ -477,12 +477,22 @@ class EloquentPlus extends \Eloquent {
             $query = DbTools::columnSearch($query);
 
             // add the defaults to the query
+            // if we have some defaults we need to check all the child columns against that key
             if (is_array($defaults) && count($defaults))
             {
                 foreach($defaults as $column => $value)
                 {
-                    if (array_key_exists($column, $this->attributes)) {
+                    // set the current model data if the attribute exists
+                    if (array_key_exists($column, $this->attributes))
+                    {
                         $query->where($column, $value);
+                    }
+
+                    // check the related models against the default key
+                    foreach($foreignKeys as $fColumn => $fColData)
+                    {
+                        //$fTableSchema =
+                        //$modelWith[] = $fColData->table;
                     }
                 }
             }
@@ -653,23 +663,23 @@ class EloquentPlus extends \Eloquent {
 
         if ($saved === true)
         {
-
-            \Log::info('model->save() call to model->deleteSmallTableCache');
             $this->deleteSmallTableCache();
 
             \Log::info('model->save() related je: ' . implode(', ', $this->related()));
-            if (true || count($this->related()))
+            foreach($this->related() as $child)
             {
-                foreach($this->related() as $child)
-                {
-                    \Log::error($child);
-                    static::flushChildren(
-                        $this->getTable(),
-                        with(new $child)->getTable(),
-                        $this->{$this->primaryKey}
-                    );
-                }
+                $child = \Str::singular($child);
+                \Cache::tags(with(new $child)->getTable())->forget($this->id);
 
+                //with(new $child)->deleteSmallTableCache();
+                /*
+                \Log::error($child);
+                static::flushChildren(
+                    $this->getTable(),
+                    with(new $child)->getTable(),
+                    $this->{$this->primaryKey}
+                );
+                */
             }
         }
 
