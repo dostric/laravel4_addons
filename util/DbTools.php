@@ -186,14 +186,20 @@ class DbTools {
      */
     public static function fKeys($table, $fresh = false)
     {
+        static $cacheData;
+
         $cacheKey = 'table_fkeys_'.$table;
 
         if ($fresh)
         {
+            $cacheData = [];
             \Cache::forget($cacheKey);
         }
 
-        $cacheData = Cache::has($cacheKey) ? Cache::get($cacheKey) : array(); //var_dump($cacheData);
+        if (!$cacheData)
+        {
+            $cacheData = Cache::has($cacheKey) ? Cache::get($cacheKey) : [];
+        }
 
         if (array_key_exists($table, $cacheData))
         {
@@ -203,25 +209,25 @@ class DbTools {
         foreach(static::getTableKeys($table) as $key => $data)
         {
             if (
-                count($local = $data->getLocalColumns()) >1 ||
-                count($foreign = $data->getForeignColumns()) >1
+                count($localKey = $data->getLocalColumns()) >1 ||
+                count($foreignKey = $data->getForeignColumns()) >1
             ) {
                 throw new \Exception('Forms support only reference to one column.');
             }
 
-            list($local) = $local;
-            list($foreign) = $foreign;
+            list($localKey) = $localKey;
+            list($foreignKey) = $foreignKey;
 
             if (!array_key_exists($table, $cacheData))
             {
                 $cacheData[$table] = array();
             }
 
-            if (!array_key_exists($local, $cacheData[$table]))
+            if (!array_key_exists($localKey, $cacheData[$table]))
             {
-                $cacheData[$table][$local] = (object)array(
+                $cacheData[$table][$localKey] = (object)array(
                     'table'     => $data->getForeignTableName(),
-                    'column'    => $foreign
+                    'column'    => $foreignKey
                 );
             }
 

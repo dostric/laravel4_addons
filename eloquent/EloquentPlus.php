@@ -43,9 +43,11 @@ class EloquentPlus extends \Eloquent {
     public $modelStoreKey = null;
 
 
-
-    // related child models
-    protected static $related = array();
+    /**
+     * Related models array.
+     * @var array
+     */
+    protected static $related = [];
 
 
     /**
@@ -53,7 +55,7 @@ class EloquentPlus extends \Eloquent {
      *
      * @var array
      */
-    protected static $rules = array();
+    protected static $rules = [];
 
 
     /**
@@ -64,7 +66,7 @@ class EloquentPlus extends \Eloquent {
     protected $validator;
 
 
-
+    protected $schema;
 
 
     public static function make()
@@ -557,7 +559,9 @@ class EloquentPlus extends \Eloquent {
             // do we need foreign tables - speed up search queries if foreign table data is not important
             if ($this->combineTables)
             {
-
+                /**
+                 * @var EloquentPlus $relatedModel
+                 */
                 foreach($data as $k => $item)
                 {
                     // get just the model attributes
