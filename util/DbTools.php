@@ -74,7 +74,9 @@ class DbTools {
     }
 
     /**
+     * Gets the table schema. By default it is cached.
      * @param $table
+     * @param bool $fresh
      * @return \Doctrine\DBAL\Schema\Column[]
      */
     public static function getTableSchema($table, $fresh = false) {
@@ -86,25 +88,25 @@ class DbTools {
             Cache::forget($cacheKey);
         }
 
-        if ( !Config::get('app.debug') && Cache::has($cacheKey) )
+        $tableColumns = Cache::get($cacheKey, null);
+
+        if ($tableColumns === null)
         {
-            return Cache::get($cacheKey);
+            $tableColumns = array();
+
+            array_map(
+                function ($item) use (&$tableColumns) {
+                    $tableColumns[$item->getName()] = $item;
+                },
+                DB::connection()
+                    ->getDoctrineSchemaManager()
+                    ->listTableColumns(
+                        $table
+                    )
+            );
+
+            Cache::put($cacheKey, $tableColumns, 24*60);
         }
-
-        $tableColumns = array();
-
-        array_map(
-            function ($item) use (&$tableColumns) {
-                $tableColumns[$item->getName()] = $item;
-            },
-            DB::connection()
-                ->getDoctrineSchemaManager()
-                ->listTableColumns(
-                    $table
-                )
-        );
-
-        Cache::put($cacheKey, $tableColumns, 60);
 
         return $tableColumns;
     }
@@ -113,7 +115,8 @@ class DbTools {
     /**
      * Returns a table schema. Schema is an array (keys are column names) and is cached.
      *
-     * @param $table
+     * @param string $table
+     * @param bool $fresh
      * @return array
      */
     public static function getFormSchema($table, $fresh = false)
@@ -125,33 +128,23 @@ class DbTools {
             Cache::forget($cacheKey);
         }
 
-        if ( !Config::get('app.debug') && Cache::has($cacheKey) )
+        $schema = Cache::get($cacheKey, null);
+
+        if ($schema === null)
         {
-            return Cache::get($cacheKey);
+            $objSchema = static::getTableSchema($table, $fresh);
+
+            $schema = array();
+
+            foreach($objSchema as $k => $item)
+            {
+                $item = $item->toArray();
+                $item['type'] = $item['type']->getName();
+                $schema[$item['name']] = $item;
+            }
+
+            Cache::put($cacheKey, $schema, 60);
         }
-
-        $objSchema = static::getTableSchema($table);
-
-        $schema = array();
-
-        foreach($objSchema as $k => $item)
-        {
-            $item = $item->toArray();
-            $item['type'] = $item['type']->getName();
-            $schema[$item['name']] = $item;
-        }
-
-        /*
-        // problem doctrine mjenja keyeve od columna;
-        $schema = array_map(function (\Doctrine\DBAL\Schema\Column $item) {
-            $item = $item->toArray();
-            $item['type'] = $item['type']->getName();
-            return $item;
-        }, $objSchema);
-        */
-        //var_dump($schema);
-
-        Cache::put($cacheKey, $schema, 60);
 
         return $schema;
 
@@ -160,6 +153,8 @@ class DbTools {
 //* @return \Doctrine\DBAL\Schema\Index[]
 
     /**
+     * Gets the table foreign keys. Method is not cached.
+     *
      * @param $table
      *
      * @return \Doctrine\DBAL\Schema\ForeignKeyConstraint[]
@@ -173,6 +168,8 @@ class DbTools {
 
 
     /**
+     * Gets the table foreign keys. By default the keys are cached.
+     *
      * @param $table
      * @param bool $fresh
      * @throws \Exception
@@ -180,50 +177,53 @@ class DbTools {
      */
     public static function fKeys($table, $fresh = false)
     {
-        $cacheKey = 'table_fkeys_'.$table;
+        static $cacheData = [];
+
+        $cacheKey = 'table_fkeys_' . $table;
 
         if ($fresh)
         {
+            unset($cacheData[$table]);
             \Cache::forget($cacheKey);
         }
 
-        $cacheData = Cache::has($cacheKey) ? Cache::get($cacheKey) : array(); //var_dump($cacheData);
-
+        // we already loaded the key
         if (array_key_exists($table, $cacheData))
         {
             return $cacheData[$table];
         }
 
-        foreach(static::getTableKeys($table) as $key => $data)
-        {
-            if (
-                count($local = $data->getLocalColumns()) >1 ||
-                count($foreign = $data->getForeignColumns()) >1
-            ) {
-                throw new \Exception('Forms support only reference to one column.');
-            }
+        // do we have it in the cache
+        $cacheData[$table] = Cache::get($cacheKey, null);
 
-            list($local) = $local;
-            list($foreign) = $foreign;
+        // none cached, load the keys
+        if ($cacheData[$table] === null) {
 
-            if (!array_key_exists($table, $cacheData))
-            {
-                $cacheData[$table] = array();
-            }
+            $cacheData[$table] = [];
 
-            if (!array_key_exists($local, $cacheData[$table]))
-            {
-                $cacheData[$table][$local] = (object)array(
-                    'table'     => $data->getForeignTableName(),
-                    'column'    => $foreign
+            // the keys are not stored jet
+            foreach (static::getTableKeys($table) as $key => $data) {
+                if (
+                    count($localKey = $data->getLocalColumns()) > 1 ||
+                    count($foreignKey = $data->getForeignColumns()) > 1
+                ) {
+                    throw new \Exception('Forms support only reference to one column.');
+                }
+
+                list($localKey) = $localKey;
+                list($foreignKey) = $foreignKey;
+
+                $cacheData[$table][$localKey] = (object)array(
+                    'table' => $data->getForeignTableName(),
+                    'column' => $foreignKey
                 );
+
             }
 
+            Cache::put($cacheKey, $cacheData[$table], 24 * 60);
         }
 
-        Cache::put($cacheKey, $cacheData, 70);
-
-        return array_key_exists($table, $cacheData) ? $cacheData[$table] : array();
+        return $cacheData[$table];
     }
 
 
@@ -308,29 +308,25 @@ class DbTools {
     }
 
 
-    public static function columnSearch($query, $data = null) {
-
+    public static function columnSearch($query, $data = null)
+    {
         $data = $data ? (array) $data : \Input::all();
 
-        if (is_array($data) && count($data)) {
-
+        if (is_array($data) && count($data))
+        {
             $table = static::getFormSchema($query->getModel()->getTable());
 
-            foreach($table as $column => $def) {
-
-                if (array_key_exists($column, $data) && (strlen($value = $data[$column]))) {
-
+            foreach($table as $column => $def)
+            {
+                if (array_key_exists($column, $data) && (strlen($value = $data[$column])))
+                {
                     $query = $query->where($column, 'LIKE', "%{$value}%");
-
                 }
-
             }
-
         }
 
         //var_dump($this);
         return $query;
-
     }
 
 

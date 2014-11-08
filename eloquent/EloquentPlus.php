@@ -1,23 +1,15 @@
 <?php namespace LaravelAddons\Eloquent;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Input;
+use Illuminate\Database\Eloquent\Model as EloquentModel;
 use \Cache;
 use \DB;
 use LaravelAddons\Util\Tools;
-use \Session;
 use LaravelAddons\Util\DbTools;
 
-/*
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/dostric/laravel4_addons.git"
-        }
-    ],
-*/
-class EloquentPlus extends \Eloquent {
+
+class EloquentPlus extends EloquentModel {
 
 
     protected $hidden = array('created_at', 'updated_at');

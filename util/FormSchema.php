@@ -49,6 +49,12 @@ class FormSchema {
     }
 
 
+    public static function make(EloquentPlus $model, $defaults = null) {
+        return new static($model, $defaults);
+    }
+
+
+
     /**
      * Remove and field form the list.
      *
