@@ -75,7 +75,8 @@ class DbTools {
 
     /**
      * Gets the table schema. By default it is cached.
-     * @param $table
+     *
+     * @param string $table
      * @param bool $fresh
      * @return \Doctrine\DBAL\Schema\Column[]
      */
@@ -150,7 +151,6 @@ class DbTools {
 
     }
 
-//* @return \Doctrine\DBAL\Schema\Index[]
 
     /**
      * Gets the table foreign keys. Method is not cached.

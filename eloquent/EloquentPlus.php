@@ -1,5 +1,6 @@
 <?php namespace LaravelAddons\Eloquent;
 
+use Doctrine\DBAL\Query\QueryBuilder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Input;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
@@ -34,9 +35,11 @@ class EloquentPlus extends EloquentModel {
     public $modelStoreKey = null;
 
 
-
-    // related child models
-    protected static $related = array();
+    /**
+     * Related models array.
+     * @var array
+     */
+    protected static $related = [];
 
 
     /**
@@ -44,7 +47,7 @@ class EloquentPlus extends EloquentModel {
      *
      * @var array
      */
-    protected static $rules = array();
+    protected static $rules = [];
 
 
     /**
@@ -55,7 +58,7 @@ class EloquentPlus extends EloquentModel {
     protected $validator;
 
 
-
+    protected $schema;
 
 
     public static function make()
@@ -99,6 +102,32 @@ class EloquentPlus extends EloquentModel {
             {
                 return $attr['name'];
             }
+
+            return null;
+
+            if (method_exists($this, 'swiftGetTitle')) {
+                return $this->swiftGetTitle();
+            }
+
+            // try to find the name on the foreign tables
+            $fKeys =  DbTools::fKeys($this->getTable());
+            foreach($fKeys as $key => $data)
+            {
+                $foreignTable = $data->table;
+                $foreignTableStructure = DbTools::getTableSchema($foreignTable);
+                $titleKey =
+                    array_key_exists('name_'.$lang, $foreignTableStructure) ? 'name_'.$lang :
+                        (array_key_exists('name', $foreignTableStructure) ? 'name' : null);
+
+                // if we have the title on the foreign table; get the title
+                if ($titleKey)
+                {
+                    return $this->{$foreignTable}->{$titleKey};
+                }
+
+            }
+
+            // we did not find the name
             return null;
         }
         throw new \Exception('Error fetching model title - model is not loaded!');
@@ -421,12 +450,13 @@ class EloquentPlus extends EloquentModel {
     /**
      * Performs search query on the model.
      *
+     * @param array $defaults
      * @return array
      */
-    public function queryForItems($defaults = null) {
-
+    public function queryForItems($defaults = null)
+    {
         // the debug state
-        $debug = \Config::get('debug') === true;
+        $debug = \Config::get('app.debug') === true;
         $lang = \App::getLocale();
 
         // the return data
@@ -439,7 +469,7 @@ class EloquentPlus extends EloquentModel {
         $table = $this->getTable();
         $foreignKeys = DbTools::fKeys($table);
 
-        $this->setHidden(array('created_at', 'updated_at'));
+        $this->setHidden(['created_at', 'updated_at']);
 
         // check search term
         $searchTerm = $this->columnSearchTerm ? $this->columnSearchTerm : Input::get('search');
@@ -466,12 +496,37 @@ class EloquentPlus extends EloquentModel {
             $query = DbTools::orderBy($query, Input::get('order_by', null));
             $query = DbTools::columnSearch($query);
 
+            // add the defaults to the query
+            // if we have some defaults we need to check all the child columns against that key
+            if (is_array($defaults) && count($defaults))
+            {
+                foreach($defaults as $column => $value)
+                {
+                    // set the current model data if the attribute exists
+                    if (array_key_exists($column, $this->attributes))
+                    {
+                        $query->where($column, $value);
+                    }
+
+                    // check the related models against the default key
+                    foreach($foreignKeys as $fColumn => $fColData)
+                    {
+                        //$fTableSchema =
+                        //$modelWith[] = $fColData->table;
+                    }
+                }
+            }
+
 
             // set initial counter
             $total = DbTools::$sqlTotalRows = 0;
 
             try {
 
+                /**
+                 * @var \Illuminate\Database\Query\Builder $query
+                 * @var \Illuminate\Database\Eloquent\Collection $data
+                 */
                 $data = $query->get();
 
                 // check if we need to manualy get the count
@@ -496,7 +551,9 @@ class EloquentPlus extends EloquentModel {
             // do we need foreign tables - speed up search queries if foreign table data is not important
             if ($this->combineTables)
             {
-
+                /**
+                 * @var EloquentPlus $relatedModel
+                 */
                 foreach($data as $k => $item)
                 {
                     // get just the model attributes
@@ -506,8 +563,9 @@ class EloquentPlus extends EloquentModel {
                     {
                         if ($item instanceof \Eloquent && ($relatedModel = $item->getRelation($colData->table)))
                         {
+                            $relatedTitle = $relatedModel->getTitle();
                             $result[$k][$column] = array(
-                                'title' => $relatedModel->getTitle(),
+                                'text' => $relatedTitle ?: 'Id: ' . $item->{$column},
                                 'id'    => $item->{$column}
                             );
 
@@ -519,12 +577,12 @@ class EloquentPlus extends EloquentModel {
 
                 }
 
-            } else {
-
-                $result = $data->toArray();
-
             }
 
+            else
+            {
+                $result = $data->toArray();
+            }
 
         } catch (\Exception $e) {
 
@@ -628,23 +686,23 @@ class EloquentPlus extends EloquentModel {
 
         if ($saved === true)
         {
-
-            \Log::info('model->save() call to model->deleteSmallTableCache');
             $this->deleteSmallTableCache();
 
             \Log::info('model->save() related je: ' . implode(', ', $this->related()));
-            if (true || count($this->related()))
+            foreach($this->related() as $child)
             {
-                foreach($this->related() as $child)
-                {
-                    \Log::error($child);
-                    static::flushChildren(
-                        $this->getTable(),
-                        with(new $child)->getTable(),
-                        $this->{$this->primaryKey}
-                    );
-                }
+                $child = \Str::singular($child);
+                \Cache::tags(with(new $child)->getTable())->forget($this->id);
 
+                //with(new $child)->deleteSmallTableCache();
+                /*
+                \Log::error($child);
+                static::flushChildren(
+                    $this->getTable(),
+                    with(new $child)->getTable(),
+                    $this->{$this->primaryKey}
+                );
+                */
             }
         }
 

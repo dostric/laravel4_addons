@@ -214,7 +214,7 @@ class FormSchema {
         $this->removeFields('searchFields', $fields);
     }
 
-    private function createFormRules($rules = '') {
+    protected function createFormRules($rules = '') {
 
         $newRules = array();
         if ($rules) {
@@ -433,6 +433,12 @@ class FormSchema {
                 )
             );
         }
+
+        /**
+         * @var array $gridFields
+         * @var array $editFields
+         * @var array $searchFields
+         */
 
         $out = array();
         foreach($this->schema as $column => $data)
