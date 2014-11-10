@@ -681,20 +681,35 @@ class EloquentPlus extends EloquentModel {
     public function update(array $data = array())
     {
         // we`ll remove all unnecessary data
-        return parent::update(self::filterModelKeys($data));
+        $updated = parent::update(self::filterModelKeys($data));
+
+        if ($updated)
+        {
+            with(new static)->deleteSmallTableCache();
+        }
+
+        return $updated;
     }
 
 
     public static function create(array $data)
     {
         // we`ll remove all unnecessary data
-        return parent::create(self::filterModelKeys($data));
+
+        $created = parent::create(self::filterModelKeys($data));
+
+        if ($created)
+        {
+            with(new static)->deleteSmallTableCache();
+        }
+
+        return $created;
     }
 
 
     public function delete()
     {
-        $deleted = self::onMaster()->delete();
+        $deleted = parent::delete();
 
         if ($deleted)
         {
