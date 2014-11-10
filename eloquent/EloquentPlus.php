@@ -520,7 +520,7 @@ class EloquentPlus extends EloquentModel {
                     // colData is the foreign table
                     $query->with([$colData->table => function($theQuery) use ($table, $colData, $defaults) {
 
-                        #$query->where('portalId', '=', 1);
+                        // apply defaults for non cached query
                         if (count($defaults))
                         {
                             // check the default field on the foreign table
@@ -531,17 +531,13 @@ class EloquentPlus extends EloquentModel {
                                     // check if the key exists - apply if found
                                     if (array_key_exists($defaultColumn, $foreignSchema))
                                     {
-                                        //return $query->where('page.portalId', 1);
                                         $theQuery->where($colData->table . '.' . $defaultColumn, $defaultValue);
                                     }
                                 }
-
                             }
                         }
 
-
                     }]);
-
 
                 }
 
@@ -559,6 +555,43 @@ class EloquentPlus extends EloquentModel {
                  * @var \Illuminate\Database\Eloquent\Collection $data
                  */
                 $data = $query->get(); //var_dump($data->toArray());
+
+                foreach($data as $k => $model) {
+
+                    // did we joined the children
+                    if ($this->combineTables)
+                    {
+                        // iterate children
+                        foreach($foreignKeys as $column => $colData)
+                        {
+                            $foreignItem = $model->{$colData->table};
+                            foreach($defaults as $defaultColumn => $defaultValue)
+                            {
+                                if (array_key_exists($defaultColumn, $foreignItem->getAttributes()))
+                                {
+                                    // on the foreign table there is the default column?
+                                    if ($foreignItem->{$defaultColumn} != $defaultValue) {
+                                        // there it is, but the value is invalid
+                                        unset($data[$k]);
+                                    }
+
+                                    // we have the value and it is valid
+                                    else
+                                    {
+                                        $data[$k][$column] = [
+                                            'id' => $foreignItem->getId(),
+                                            'text' => $foreignItem->getTitle()
+                                        ];
+                                        unset($data[$k][$colData->table]);
+                                    }
+                                }
+                            }
+
+
+                        }
+                    }
+                }
+
 
                 $result = $data->toArray();
 
