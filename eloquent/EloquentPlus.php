@@ -553,6 +553,7 @@ class EloquentPlus extends EloquentModel {
                 /**
                  * @var \Illuminate\Database\Query\Builder $query
                  * @var \Illuminate\Database\Eloquent\Collection $data
+                 * @var EloquentPlus $foreignItem
                  */
                 $data = $query->get(); //var_dump($data->toArray());
 
