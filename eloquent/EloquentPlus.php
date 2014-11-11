@@ -456,6 +456,7 @@ class EloquentPlus extends EloquentModel {
     public function queryForItems($defaults = null)
     {
         // the debug state
+        $defaults = is_array($defaults) && count($defaults) ? $defaults : [];
         $debug = \Config::get('app.debug') === true;
         $lang = \App::getLocale();
 
@@ -467,6 +468,7 @@ class EloquentPlus extends EloquentModel {
 
         // table and fkeys
         $table = $this->getTable();
+        $localTableSchema = DbTools::getTableSchema($table);
         $foreignKeys = DbTools::fKeys($table);
 
         $this->setHidden(['created_at', 'updated_at']);
@@ -485,49 +487,80 @@ class EloquentPlus extends EloquentModel {
 
         try {
 
-            $query = $this
-                ->with($modelWith)
-                ->select(array(
-                    \DB::raw('SQL_CALC_FOUND_ROWS `' . static::getModel()->getTable() . '`.*')
-                ));
+            /**
+             * @var \Illuminate\Database\Query\Builder $query
+             */
+            $query = $this->select([
+                \DB::raw('SQL_CALC_FOUND_ROWS `' . static::getModel()->getTable() . '`.*')
+            ]);
 
             $query = DbTools::paginate($query, Input::get('page', null));
             $query = DbTools::search($query, $searchTerm);
             $query = DbTools::orderBy($query, Input::get('order_by', null));
             $query = DbTools::columnSearch($query);
 
-            // add the defaults to the query
-            // if we have some defaults we need to check all the child columns against that key
-            if (is_array($defaults) && count($defaults))
+            // local query defaults checking
+            foreach($defaults as $column => $value)
             {
-                foreach($defaults as $column => $value)
+                // set the current model data if the attribute exists
+                if (array_key_exists($column, $localTableSchema))
                 {
-                    // set the current model data if the attribute exists
-                    if (array_key_exists($column, $this->attributes))
-                    {
-                        $query->where($column, $value);
-                    }
-
-                    // check the related models against the default key
-                    foreach($foreignKeys as $fColumn => $fColData)
-                    {
-                        //$fTableSchema =
-                        //$modelWith[] = $fColData->table;
-                    }
+                    $query = $query->where($column, $value);
                 }
             }
 
 
+            // do we need foreign tables - speed up search queries if foreign table data is not important
+            if ($this->combineTables)
+            {
+                foreach($foreignKeys as $column => $colData)
+                {
+                    #$query->with($colData->table);
+
+                    // colData is the foreign table
+                    $query->with([$colData->table => function($theQuery) use ($table, $colData, $defaults) {
+
+                        #$query->where('portalId', '=', 1);
+                        if (count($defaults))
+                        {
+                            // check the default field on the foreign table
+                            if ($foreignSchema = DbTools::getTableSchema($colData->table))
+                            {
+                                foreach($defaults as $defaultColumn => $defaultValue)
+                                {
+                                    // check if the key exists - apply if found
+                                    if (array_key_exists($defaultColumn, $foreignSchema))
+                                    {
+                                        //return $query->where('page.portalId', 1);
+                                        $theQuery->where($colData->table . '.' . $defaultColumn, $defaultValue);
+                                    }
+                                }
+
+                            }
+                        }
+
+
+                    }]);
+
+
+                }
+
+            }
+
+
+
+            // perform the query
             // set initial counter
             $total = DbTools::$sqlTotalRows = 0;
 
             try {
-
                 /**
                  * @var \Illuminate\Database\Query\Builder $query
                  * @var \Illuminate\Database\Eloquent\Collection $data
                  */
-                $data = $query->get();
+                $data = $query->get(); //var_dump($data->toArray());
+
+                $result = $data->toArray();
 
                 // check if we need to manualy get the count
                 if (DbTools::$sqlTotalRows == 'get')
@@ -537,52 +570,24 @@ class EloquentPlus extends EloquentModel {
 
                 $total = Tools::is_pdigit(DbTools::$sqlTotalRows) ? DbTools::$sqlTotalRows : 0;
 
-            } catch (\Exception $e) {
+            }
 
+            catch (\Exception $e)
+            {
                 $data = array();
 
                 $errors[] = $debug ?
                     'Error fetching data.' :
                     $e->getMessage() . ' Query: '.$query->toSql();
 
+                var_dump($e->toArray());
             }
 
 
-            // do we need foreign tables - speed up search queries if foreign table data is not important
-            if ($this->combineTables)
-            {
-                /**
-                 * @var EloquentPlus $relatedModel
-                 */
-                foreach($data as $k => $item)
-                {
-                    // get just the model attributes
-                    $result[$k] = $item->attributesToArray();
 
-                    foreach($foreignKeys as $column => $colData)
-                    {
-                        if ($item instanceof \Eloquent && ($relatedModel = $item->getRelation($colData->table)))
-                        {
-                            $relatedTitle = $relatedModel->getTitle();
-                            $result[$k][$column] = array(
-                                'text' => $relatedTitle ?: 'Id: ' . $item->{$column},
-                                'id'    => $item->{$column}
-                            );
 
-                            //$result[$k]['fkvalue_'.$column] = $foreignTitle;
-                            //unset($result[$k][$colData->table]);
-                        }
-
-                    }
-
-                }
-
-            }
-
-            else
-            {
-                $result = $data->toArray();
-            }
+            //var_dump($data->toArray());
+            //exit('hjghj');
 
         } catch (\Exception $e) {
 
@@ -594,6 +599,7 @@ class EloquentPlus extends EloquentModel {
                 'Error fetching data.' :
                 $e->getMessage() . ' at ' . $e->getFile() . ' line ' . $e->getLine();
 
+            var_dump($e->toArray());
         }
 
         if (count($errors))
