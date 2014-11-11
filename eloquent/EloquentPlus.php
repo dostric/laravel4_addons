@@ -71,7 +71,6 @@ class EloquentPlus extends EloquentModel {
      * Helper for getting the model id.
      *
      * @return mixed
-     * @throws \Exception
      */
     public function getId()
     {
@@ -79,7 +78,7 @@ class EloquentPlus extends EloquentModel {
         {
             return $this->{$this->primaryKey};
         }
-        throw new \Exception('Error fetching model id - model is not loaded!');
+        return null;
     }
 
     /**
@@ -425,7 +424,7 @@ class EloquentPlus extends EloquentModel {
 
         $counter = 0;
 
-        if (count($ids = Tools::parseIntArrayFromCSV($ids))) {
+        if (count($ids = Tools::filter_pdigit_csv($ids))) {
 
             try {
 

@@ -48,6 +48,10 @@ class Tools {
     }
 
 
+    /**
+     * @param array $data
+     * @return bool
+     */
     public static function is_pdigit_array(array $data)
     {
         foreach($data as $item)
@@ -69,9 +73,30 @@ class Tools {
     }
 
 
-    function filter_pdigit_csv($data)
+    /**
+     * @param $data
+     * @return array
+     */
+    public static function filter_pdigit($data)
     {
-        $data = explode(',', $data);
+        // array input
+        if (is_array($data) && count($data))
+        {
+            return static::filter_pdigit_array($data);
+        }
+
+        // string csv input
+        elseif (is_string($data) && strlen($data))
+        {
+            return static::filter_pdigit_csv($data);
+        }
+
+        return [];
+    }
+
+
+    public static function filter_pdigit_array($data)
+    {
         foreach($data as $k => $item)
         {
             if (!static::is_pdigit($item)) unset($data[$k]);
@@ -80,30 +105,10 @@ class Tools {
     }
 
 
-    /**
-     * @param string|array $csv
-     * @return array
-     */
-    public static function parseIntArrayFromCSV($csv) {
-
-        $result = array();
-
-        if (!is_array($csv)) {
-            $csv = explode(',', $csv);
-        }
-
-        if (is_array($csv) && count($csv)) {
-
-            foreach($csv as $item) {
-                if (static::is_pdigit($item = trim($item))) {
-                    $result[] = $item;
-                }
-            }
-
-        }
-
-        return $result;
-
+    public static function filter_pdigit_csv($data)
+    {
+        $data = explode(',', $data);
+        return static::filter_pdigit_array($data);
     }
 
 
