@@ -35,6 +35,7 @@ class CachedHasMany extends HasMany {
      */
     public function match(array $models, Collection $results, $relation)
     {
+        exit("MATCH");
         return $this->matchMany($models, $results, $relation);
     }
 
@@ -43,7 +44,7 @@ class CachedHasMany extends HasMany {
     {
         $dictionary = $this->buildDictionary($results);
 
-        //exit("matchOneOrMany");
+        exit("matchOneOrMany");
 
         // Once we have the dictionary we can simply spin through the parent models to
         // link them up with their children using the keyed dictionary to make the
