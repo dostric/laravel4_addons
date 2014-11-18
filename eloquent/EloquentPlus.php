@@ -650,7 +650,6 @@ class EloquentPlus extends EloquentModel {
                     'Error fetching data.' :
                     $e->getMessage() . ' Query: '.$query->toSql();
 
-                var_dump($e->toArray());
             }
 
 

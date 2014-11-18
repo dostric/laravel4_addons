@@ -4,10 +4,14 @@ use \Cache;
 use \Config;
 use \DB;
 use Illuminate\Support\Collection;
+use Mars\Util\InformationSchema;
 
 class DbTools {
 
     public static $sqlTotalRows;
+
+    protected static $informationSchema;
+
 
 
     public static function dataMap($type, $items, $valueCol, $labelCol, $addItem = false)
@@ -28,49 +32,26 @@ class DbTools {
     }
 
 
-    /**
-     * \Doctrine\DBAL\Schema\Table[]
-     */
-    public static function listTables($toCollection = true, $connectionName = null) {
+    public static function getSchema()
+    {
+        return self::$informationSchema ?: self::$informationSchema = new InformationSchema(\DB::getPdo());
+    }
 
-        $tables = array();
 
-        if ($connection = DB::connection($connectionName)) {
+    public static function listTables($fresh = false)
+    {
+        $cacheKey = 'db_' . \Config::get('app.database.default') . '_tables';
 
-            $cacheKey = 'db_schema_'.$connection->getName();
-
-            if ( !Config::get('app.debug') && Cache::has($cacheKey) )  {
-                return Cache::get($cacheKey);
-            }
-
-            array_map(
-                function ($item) use (&$tables) {
-                    $tables[$item->getName()] = $item;
-                },
-                DB::connection()
-                    ->getDoctrineSchemaManager()
-                    ->listTables()
-            );
-
-            Cache::put($cacheKey, $tables, 60);
-
+        if ( !$fresh && Cache::has($cacheKey) )
+        {
+            return Cache::get($cacheKey);
         }
 
+        $tables = self::getSchema()->getTables();
 
-        return $toCollection ? new Collection($tables) : $tables;
+        Cache::put($cacheKey, $tables, 1200);
 
-/*
-
-        foreach($tables as $name => $table) {
-
-            foreach($table->getColumns() as $column) {
-                echo $name . ' == ' . $column->getName() . " - " . $column->getType() . "<br>";
-            }
-
-        }
-
-*/
-
+        return $tables;
     }
 
     /**
@@ -80,8 +61,8 @@ class DbTools {
      * @param bool $fresh
      * @return \Doctrine\DBAL\Schema\Column[]
      */
-    public static function getTableSchema($table, $fresh = false) {
-
+    public static function getTableSchema($table, $fresh = false)
+    {
         $cacheKey = 'table_schema_'.$table;
 
         if ($fresh)
@@ -93,18 +74,7 @@ class DbTools {
 
         if ($tableColumns === null)
         {
-            $tableColumns = array();
-
-            array_map(
-                function ($item) use (&$tableColumns) {
-                    $tableColumns[$item->getName()] = $item;
-                },
-                DB::connection()
-                    ->getDoctrineSchemaManager()
-                    ->listTableColumns(
-                        $table
-                    )
-            );
+            $tableColumns = self::getSchema()->getColumns($table);
 
             Cache::put($cacheKey, $tableColumns, 24*60);
         }
@@ -122,6 +92,8 @@ class DbTools {
      */
     public static function getFormSchema($table, $fresh = false)
     {
+        return self::getTableSchema($table);
+
         $cacheKey = 'table_form_schema_'.$table;
 
         if ($fresh)
@@ -157,13 +129,11 @@ class DbTools {
      *
      * @param $table
      *
-     * @return \Doctrine\DBAL\Schema\ForeignKeyConstraint[]
+     * @return array
      */
     public static function getTableKeys($table)
     {
-        return DB::getDoctrineSchemaManager()
-            ->listTableDetails($table)
-            ->getForeignKeys();
+        return self::getSchema()->getForeignKeys($table);
     }
 
 
@@ -179,7 +149,7 @@ class DbTools {
     {
         static $cacheData = [];
 
-        $cacheKey = 'table_fkeys_' . $table;
+        $cacheKey = 'table_fkeys_'.$table;
 
         if ($fresh)
         {
@@ -197,27 +167,17 @@ class DbTools {
         $cacheData[$table] = Cache::get($cacheKey, null);
 
         // none cached, load the keys
-        if ($cacheData[$table] === null) {
-
+        if ($cacheData[$table] === null)
+        {
             $cacheData[$table] = [];
 
             // the keys are not stored jet
-            foreach (static::getTableKeys($table) as $key => $data) {
-                if (
-                    count($localKey = $data->getLocalColumns()) > 1 ||
-                    count($foreignKey = $data->getForeignColumns()) > 1
-                ) {
-                    throw new \Exception('Forms support only reference to one column.');
-                }
-
-                list($localKey) = $localKey;
-                list($foreignKey) = $foreignKey;
-
-                $cacheData[$table][$localKey] = (object)array(
-                    'table' => $data->getForeignTableName(),
-                    'column' => $foreignKey
-                );
-
+            foreach (static::getTableKeys($table) as $data)
+            {
+                $cacheData[$table][$data['column']] = (object)[
+                    'table' => $data['referenced_table'],
+                    'column' => $data['referenced_column']
+                ];
             }
 
             Cache::put($cacheKey, $cacheData[$table], 24 * 60);
@@ -406,6 +366,59 @@ class DbTools {
     public static function detectModelClassByTable($table)
     {
         return static::detectModelClass(str_singular($table));
+    }
+
+}
+
+
+
+class mysqlForeignKeys {
+
+    protected $keys;
+
+    public function __construct($table)
+    {
+        $SQL = "
+        SELECT
+            CONSTRAINT_NAME AS keyName,
+            `column_name` AS local_column,
+            `referenced_table_schema` AS foreign_db,
+            `referenced_table_name` AS foreign_table,
+            `referenced_column_name`  AS foreign_column
+        FROM
+            `information_schema`.`KEY_COLUMN_USAGE`
+        WHERE
+            `constraint_schema` = SCHEMA()
+        AND
+            `table_name` = '{$table}'
+        AND
+            `referenced_column_name` IS NOT NULL
+        ORDER BY
+            `column_name`";
+
+        $keys = \DB::select( \DB::raw($SQL) );
+        foreach($keys as $key)
+        {
+            if (!isset($this->keys[$key['keyName']])) $this->keys[$key['keyName']] = [];
+            $this->keys[$key['keyName']] = $key;
+        }
+    }
+
+
+    public function getKey()
+    {
+        $result = [];
+        foreach($this->keys as $keyName => $theKey)
+        {
+            $localColumn = $theKey['local_column'];
+            if (!isset($result[$localColumn])) $result[$localColumn] = [];
+
+            $result[$localColumn][] = [
+                'table'     => $theKey['foreign_table'],
+                'column'    => $theKey['foreign_column']
+            ];
+        }
+        return $result;
     }
 
 }
