@@ -474,6 +474,22 @@ class EloquentPlus extends EloquentModel {
 
         // check search term
         $searchTerm = $this->columnSearchTerm ? $this->columnSearchTerm : Input::get('search');
+        if (stripos($searchTerm, ':') !== false)
+        {
+            list($searchColumn, $searchColumnText) = explode(':', $searchTerm);
+            if (array_key_exists($searchColumn, $localTableSchema))
+            {
+                // search column and text are OK
+                $searchTerm = [
+                    $searchColumn => $searchColumnText
+                ];
+            }
+
+            else
+            {
+                // the column does not exist - just leave it
+            }
+        }
 
         $modelWith = array();
         if ($this->combineTables)
@@ -494,9 +510,20 @@ class EloquentPlus extends EloquentModel {
             ]);
 
             $query = DbTools::paginate($query, Input::get('page', null));
-            $query = DbTools::search($query, $searchTerm);
             $query = DbTools::orderBy($query, Input::get('order_by', null));
-            $query = DbTools::columnSearch($query);
+
+
+            if (is_array($searchTerm))
+            {
+                \Log::info('Pretraga: ', $searchTerm);
+                $query = DbTools::columnSearch($query, $searchTerm);
+            }
+
+            elseif (strlen($searchTerm))
+            {
+                \Log::info('Pretraga texta: ' . $searchTerm);
+                $query = DbTools::search($query, $searchTerm);
+            }
 
             // local query defaults checking
             foreach($defaults as $column => $value)
