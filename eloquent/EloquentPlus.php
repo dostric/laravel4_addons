@@ -526,10 +526,15 @@ class EloquentPlus extends EloquentModel {
             }
 
             // local query defaults checking
+            $prefixedLocalTableSchema = \Mars\Util\array_prefix_key(
+                $localTableSchema,
+                $table . '.',
+                false
+            );
             foreach($defaults as $column => $value)
             {
                 // set the current model data if the attribute exists
-                if (array_key_exists($column, $localTableSchema))
+                if (array_key_exists($column, $prefixedLocalTableSchema))
                 {
                     $query = $query->where($column, $value);
                 }
@@ -539,18 +544,23 @@ class EloquentPlus extends EloquentModel {
             // do we need foreign tables - speed up search queries if foreign table data is not important
             if ($this->combineTables)
             {
+                // iterate local foreign keys
                 foreach($foreignKeys as $column => $colData)
                 {
-                    #$query->with($colData->table);
-
-                    // colData is the foreign table
+                    // combine local table with foreign and filter foreign table with defaults
                     $query->with([$colData->table => function($theQuery) use ($table, $colData, $defaults) {
 
                         // apply defaults for non cached query
                         if (count($defaults))
                         {
-                            // check the default field on the foreign table
-                            if ($foreignSchema = DbTools::getTableSchema($colData->table))
+                            // get the foreign table schema; prefix the keys with table name and a dot
+                            $foreignSchema = \Mars\Util\array_prefix_key(
+                                DbTools::getTableSchema($colData->table),
+                                $colData->table . '.',
+                                false
+                            );
+
+                            if (count($foreignSchema))
                             {
                                 foreach($defaults as $defaultColumn => $defaultValue)
                                 {
