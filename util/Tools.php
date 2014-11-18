@@ -112,13 +112,6 @@ class Tools {
     }
 
 
-    public static function isCsrfTokenOk()
-    {
-        $one = \Session::token() == \Input::get('_token');
-        $two = \Session::token() == \Request::header('_token', null);
-        return $one || $two;
-    }
-
 }
 
 
