@@ -28,8 +28,8 @@ class FormSchema {
     protected $defaults;
 
 
-    public function __construct(EloquentPlus $model, $defaults = null) {
-
+    public function __construct(EloquentPlus $model, $defaults = null)
+    {
         $this->model = $model;
         $this->table = $model->getTable();
 
@@ -49,7 +49,8 @@ class FormSchema {
     }
 
 
-    public static function make(EloquentPlus $model, $defaults = null) {
+    public static function make(EloquentPlus $model, $defaults = null)
+    {
         return new static($model, $defaults);
     }
 
@@ -96,12 +97,12 @@ class FormSchema {
      * @param $entity
      * @param $field
      */
-    protected function addField($entity, $field) {
-
-        if (array_key_exists($field, $this->schema) && !in_array($field, $this->{$entity})) {
+    protected function addField($entity, $field)
+    {
+        if (array_key_exists($field, $this->schema) && !in_array($field, $this->{$entity}))
+        {
             $this->{$entity}[] = $field;
         }
-
     }
 
 
@@ -111,20 +112,20 @@ class FormSchema {
      * @param $entity
      * @param $fields
      */
-    protected function addFields($entity, $fields) {
-
-        if ($this->schema) {
-
-            if (!is_array($fields)) {
+    protected function addFields($entity, $fields)
+    {
+        if ($this->schema)
+        {
+            if (!is_array($fields))
+            {
                 $fields = explode(',', $fields);
             }
 
-            foreach((array)$fields as $col) {
+            foreach((array)$fields as $col)
+            {
                 $this->addField($entity, $col);
             }
-
         }
-
     }
 
 
@@ -439,7 +440,6 @@ class FormSchema {
          * @var array $editFields
          * @var array $searchFields
          */
-
         $out = array();
         foreach($this->schema as $column => $data)
         {

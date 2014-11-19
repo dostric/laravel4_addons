@@ -347,7 +347,8 @@ class DbTools {
     public static function detectModelClass($model)
     {
         foreach([
-            'lib/cms/models' => '\Cms\Models'
+            'lib/cms/models' => '\Cms\Models',
+            'lib/mars/models' => '\Mars\Models'
         ] as $folder => $namespace)
         {
             $className = studly_case($model);
