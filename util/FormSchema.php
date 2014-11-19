@@ -284,7 +284,7 @@ class FormSchema {
             $data = array(
                 'widget' => null,
                 'defaultValue' => addslashes($colData['default']),
-                'required' => $colData['notnull'],
+                'required' => $colData['null'] ? false : true,
                 'validate' => $columnRules
             );
 
@@ -358,7 +358,7 @@ class FormSchema {
                         array(
                             'multi' => false,
                             'source' => $fData,
-                            'allowClear' => $colData['notnull'] ? false : true
+                            'allowClear' => $colData['null'] ? true : false
                         )
                     );
 
