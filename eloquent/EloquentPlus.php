@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Input;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use \Cache;
 use \DB;
+use LaravelAddons\Util\AngularCollection;
 use LaravelAddons\Util\Tools;
 use LaravelAddons\Util\DbTools;
 
@@ -102,34 +103,55 @@ class EloquentPlus extends EloquentModel {
                 return $attr['name'];
             }
 
-            return null;
-
-            if (method_exists($this, 'swiftGetTitle')) {
-                return $this->swiftGetTitle();
-            }
-
-            // try to find the name on the foreign tables
-            $fKeys =  DbTools::fKeys($this->getTable());
-            foreach($fKeys as $key => $data)
-            {
-                $foreignTable = $data->table;
-                $foreignTableStructure = DbTools::getTableSchema($foreignTable);
-                $titleKey =
-                    array_key_exists('name_'.$lang, $foreignTableStructure) ? 'name_'.$lang :
-                        (array_key_exists('name', $foreignTableStructure) ? 'name' : null);
-
-                // if we have the title on the foreign table; get the title
-                if ($titleKey)
-                {
-                    return $this->{$foreignTable}->{$titleKey};
-                }
-
-            }
-
             // we did not find the name
             return null;
         }
         throw new \Exception('Error fetching model title - model is not loaded!');
+    }
+
+
+    public function hasRelation($name)
+    {
+        return array_key_exists($name, $this->relations);
+    }
+
+
+    public function getAngularArray() {
+        return [
+            'id' => $this->getId(),
+            'text' => $this->getTitle()
+        ];
+    }
+
+    public function getAngularRelations()
+    {
+        $relations = [];
+        $arrayableRelations = $this->getArrayableRelations();
+
+        if (count($arrayableRelations))
+        {
+            foreach($arrayableRelations as $relationName => $relationModel)
+            {
+                $current = $this->getAngularArray();
+                //$current = $this->toArray();
+                if ($child = $relationModel->getAngularRelations())
+                {
+                    $current = array_merge($current, $child);
+                }
+
+                $relations[$relationName] = $current;
+
+            }
+
+        }
+
+        else
+        {
+            return null;
+        }
+
+        return $relations;
+
     }
 
 
@@ -155,7 +177,7 @@ class EloquentPlus extends EloquentModel {
     {
         if ($this->storeCollectionByPK && count($models))
         {
-            $coll = new \Illuminate\Database\Eloquent\Collection();
+            $coll = new AngularCollection();
 
             $mKey = current($models);
             if ($mKey)
@@ -171,7 +193,7 @@ class EloquentPlus extends EloquentModel {
             }
 
         } else {
-            $coll = new \Illuminate\Database\Eloquent\Collection($models);
+            $coll = new AngularCollection($models);
         }
 
         return $coll;
