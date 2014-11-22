@@ -50,12 +50,14 @@ class AngularCollection extends Collection {
                     if ($relation = $value->{$foreign->table})
                     {
                         $angularRelations = $relation->getAngularRelations();
-                        $data[$local] = array_merge(
+
+                        // before we saved the local key...
+                        $data[$foreign->table] = array_merge(
                             $relation->getAngularArray(),
                             is_array($angularRelations) ? $angularRelations : []
                         );
-                        $schemaKeys[] = $local;
-                        unset($data[$foreign->table]);
+                        $schemaKeys[] = $foreign->table;
+                        unset($data[$local]);
                     }
                 }
             }
