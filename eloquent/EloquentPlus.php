@@ -14,7 +14,7 @@ use LaravelAddons\Util\DbTools;
 class EloquentPlus extends EloquentModel {
 
 
-    protected $hidden = array('created_at', 'updated_at');
+    protected $hidden = array('created_at', 'updated_at', 'timestampUpdated', 'timestampCreated');
 
 
     public $smallTableRows = 500;
@@ -42,6 +42,8 @@ class EloquentPlus extends EloquentModel {
      */
     protected static $related = [];
 
+    protected $custom_relations = [];
+
 
     /**
      * Validation rules.
@@ -67,6 +69,23 @@ class EloquentPlus extends EloquentModel {
         return new static();
     }
 
+
+    public function toAngular()
+    {
+        $data = $this->getAttributes();
+        if (count($cr = $this->getCustomRelations()))
+        {
+            foreach($cr as $relation)
+            {
+                $data[$relation] = $this->{$relation}->toAngular();
+            }
+        }
+        return $data;
+    }
+
+    public function getCustomRelations() {
+        return $this->custom_relations;
+    }
 
     /**
      * Helper for getting the model id.
@@ -134,7 +153,17 @@ class EloquentPlus extends EloquentModel {
             {
                 $current = $this->getAngularArray();
                 //$current = $this->toArray();
-                if ($child = $relationModel->getAngularRelations())
+                //if ($child = $relationModel->getAngularRelations())
+
+                if ($relationModel instanceof AngularCollection) {
+                    $child = $relationModel->toAngular();
+                }
+                else
+                {
+                    $child = $relationModel->getAngularRelations();
+                }
+
+                if ($child)
                 {
                     $current = array_merge($current, $child);
                 }

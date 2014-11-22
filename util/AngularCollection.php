@@ -7,6 +7,9 @@ class AngularCollection extends Collection {
 
 
 
+    public function getAllRealtions() {
+
+    }
 
     public function toAngular()
     {
@@ -21,8 +24,20 @@ class AngularCollection extends Collection {
             /** @var EloquentPlus $value */
 
             $data = $value->toArray();
+
+            if (count($cRealtions = $value->getCustomRelations())) {
+                foreach($cRealtions as $cTable)
+                {
+                    //var_dump($cTable, $value->$cTable); exit();
+                    $data[$cTable] = $value->{$cTable}->toAngular();
+                }
+            }
+
+
+
             $fKeys = DbTools::fKeys($value->getTable());
 
+            //var_dump($value); exit();
             foreach($fKeys as $local => $foreign)
             {
                 if (array_key_exists($foreign->table, $data))
@@ -30,6 +45,7 @@ class AngularCollection extends Collection {
                     // does the relation exists
                     if ($relation = $value->{$foreign->table})
                     {
+                        #$angularRelations = $relation instanceof AngularCollection ? $relation->toAngular() : $relation->getAngularRelations();
                         $angularRelations = $relation->getAngularRelations();
                         $data[$local] = array_merge(
                             $relation->getAngularArray(),
@@ -39,6 +55,9 @@ class AngularCollection extends Collection {
                     }
                 }
             }
+
+
+
 
             return $data;
 
