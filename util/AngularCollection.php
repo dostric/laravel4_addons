@@ -25,7 +25,9 @@ class AngularCollection extends Collection {
 
             $data = $value->toArray();
 
-            if (count($cRealtions = $value->getCustomRelations())) {
+            // fix custom relations
+            if (count($cRealtions = $value->getCustomRelations()))
+            {
                 foreach($cRealtions as $cTable)
                 {
                     //var_dump($cTable, $value->$cTable); exit();
@@ -49,7 +51,7 @@ class AngularCollection extends Collection {
                         $angularRelations = $relation->getAngularRelations();
                         $data[$local] = array_merge(
                             $relation->getAngularArray(),
-                            is_array($angularRelations) ? $angularRelations : []
+                            is_array($angularRelations) ? $angularRelations : ['keko' => 'zeko']
                         );
                         unset($data[$foreign->table]);
                     }

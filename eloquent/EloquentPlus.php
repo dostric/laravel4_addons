@@ -72,7 +72,7 @@ class EloquentPlus extends EloquentModel {
 
     public function toAngular()
     {
-        $data = $this->getAttributes();
+        $data = $this->toArray();
         if (count($cr = $this->getCustomRelations()))
         {
             foreach($cr as $relation)
@@ -80,6 +80,26 @@ class EloquentPlus extends EloquentModel {
                 $data[$relation] = $this->{$relation}->toAngular();
             }
         }
+
+        $fKeys = DbTools::fKeys($this->getTable());
+
+        foreach($fKeys as $local => $foreign)
+        {
+            if (array_key_exists($foreign->table, $data))
+            {
+                // does the relation exists
+                if ($relation = $this->{$foreign->table})
+                {
+                    $angularRelations = $relation->getAngularRelations();
+                    $data[$local] = array_merge(
+                        $relation->getAngularArray(),
+                        is_array($angularRelations) ? $angularRelations : ['keko' => 'zeko']
+                    );
+                    unset($data[$foreign->table]);
+                }
+            }
+        }
+
         return $data;
     }
 
@@ -151,13 +171,13 @@ class EloquentPlus extends EloquentModel {
         {
             foreach($arrayableRelations as $relationName => $relationModel)
             {
-                $current = $this->getAngularArray();
-                //$current = $this->toArray();
-                //if ($child = $relationModel->getAngularRelations())
+                $current = $relationModel->getAngularArray();
 
-                if ($relationModel instanceof AngularCollection) {
+                if ($relationModel instanceof AngularCollection)
+                {
                     $child = $relationModel->toAngular();
                 }
+
                 else
                 {
                     $child = $relationModel->getAngularRelations();
