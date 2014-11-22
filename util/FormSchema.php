@@ -27,8 +27,13 @@ class FormSchema {
 
     protected $defaults;
 
+    /**
+     * @var array
+     */
+    protected $settings;
 
-    public function __construct(EloquentPlus $model, $defaults = null)
+
+    public function __construct(EloquentPlus $model, $defaults = null, array $settings = null)
     {
         $this->model = $model;
         $this->table = $model->getTable();
@@ -46,15 +51,27 @@ class FormSchema {
         $this->searchFields = array();
 
         $this->defaults = $defaults;
+
+        $this->settings = $settings ?: [];
+
+        if (!array_key_exists('schema_recursive', $this->settings)) {
+            $this->settings['schema_recursive'] = '*';
+        }
+
     }
 
 
-    public static function make(EloquentPlus $model, $defaults = null)
+    public static function make(EloquentPlus $model, $defaults = null, array $settings = null)
     {
-        return new static($model, $defaults);
+        return new static($model, $defaults, $settings);
     }
 
 
+    public function settings($what, $default)
+    {
+        return
+            array_key_exists($what, $this->settings) ? $this->settings[$what] : $default;
+    }
 
     /**
      * Remove and field form the list.

@@ -93,7 +93,7 @@ class EloquentPlus extends EloquentModel {
                     $angularRelations = $relation->getAngularRelations();
                     $data[$local] = array_merge(
                         $relation->getAngularArray(),
-                        is_array($angularRelations) ? $angularRelations : ['keko' => 'zeko']
+                        is_array($angularRelations) ? $angularRelations : []
                     );
                     unset($data[$foreign->table]);
                 }
@@ -155,7 +155,8 @@ class EloquentPlus extends EloquentModel {
     }
 
 
-    public function getAngularArray() {
+    public function getAngularArray()
+    {
         return [
             'id' => $this->getId(),
             'text' => $this->getTitle()

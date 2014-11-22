@@ -7,31 +7,33 @@ class AngularCollection extends Collection {
 
 
 
-    public function getAllRealtions() {
-
-    }
-
-    public function toAngular()
+    public function toAngular($forSchema = false)
     {
-        return array_map(function($value)
+        return array_values(array_map(function($value) use ($forSchema)
         {
             // for many?
-            if ($value instanceof ArrayableInterface) {
-                throw new \Exception('->toAngular Nisam ovo jos testirao!');
-                return $value->toAngular();
-            }
+            if ($value instanceof ArrayableInterface) { throw new \Exception('->toAngular Nisam ovo jos testirao!'); return $value->toAngular(); }
 
             /** @var EloquentPlus $value */
 
             $data = $value->toArray();
+            $schemaKeys = ['id', 'text'];
 
             // fix custom relations
             if (count($cRealtions = $value->getCustomRelations()))
             {
                 foreach($cRealtions as $cTable)
                 {
-                    //var_dump($cTable, $value->$cTable); exit();
-                    $data[$cTable] = $value->{$cTable}->toAngular();
+                    if ($cRelation = $value->{$cTable})
+                    {
+                        $data[$cTable] = $cRelation->toAngular();
+                        $schemaKeys[] = $cTable;
+                    }
+
+                    else
+                    {
+                        \Log::warning('Custom relation does not exist! Relation: '.$cTable);
+                    }
                 }
             }
 
@@ -39,31 +41,33 @@ class AngularCollection extends Collection {
 
             $fKeys = DbTools::fKeys($value->getTable());
 
-            //var_dump($value); exit();
             foreach($fKeys as $local => $foreign)
             {
                 if (array_key_exists($foreign->table, $data))
                 {
                     // does the relation exists
+                    // if yes get its
                     if ($relation = $value->{$foreign->table})
                     {
-                        #$angularRelations = $relation instanceof AngularCollection ? $relation->toAngular() : $relation->getAngularRelations();
                         $angularRelations = $relation->getAngularRelations();
                         $data[$local] = array_merge(
                             $relation->getAngularArray(),
-                            is_array($angularRelations) ? $angularRelations : ['keko' => 'zeko']
+                            is_array($angularRelations) ? $angularRelations : []
                         );
+                        $schemaKeys[] = $local;
                         unset($data[$foreign->table]);
                     }
                 }
             }
 
-
-
+            if ($forSchema) {
+                $data['text'] = $value->getTitle();
+                $data = array_intersect_key($data, array_flip($schemaKeys));
+            }
 
             return $data;
 
-        }, $this->items);
+        }, $this->items));
     }
 
 
