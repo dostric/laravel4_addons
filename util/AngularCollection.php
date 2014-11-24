@@ -15,6 +15,7 @@ class AngularCollection extends Collection {
             if ($value instanceof ArrayableInterface) { throw new \Exception('->toAngular Nisam ovo jos testirao!'); return $value->toAngular(); }
 
             /** @var EloquentPlus $value */
+            /** @var EloquentPlus $relation */
 
             $data = $value->toArray();
             $schemaKeys = ['id', 'text'];
@@ -49,15 +50,17 @@ class AngularCollection extends Collection {
                     // if yes get its
                     if ($relation = $value->{$foreign->table})
                     {
-                        $angularRelations = $relation->getAngularRelations();
+                        try {
+                            $data[$local] = array_merge(
+                                $relation->getAngularArray(),
+                                $relation->getAngularRelations()
+                            );
+                        } catch (\Exception $e) {
+                            exit('asdasd');
+                        }
 
-                        // before we saved the local key...
-                        $data[$foreign->table] = array_merge(
-                            $relation->getAngularArray(),
-                            is_array($angularRelations) ? $angularRelations : []
-                        );
-                        $schemaKeys[] = $foreign->table;
-                        unset($data[$local]);
+                        $schemaKeys[] = $local; // do not delete this key if we need it in schema
+                        unset($data[$foreign->table]);
                     }
                 }
             }
@@ -83,4 +86,3 @@ class AngularCollection extends Collection {
 
 
 }
-

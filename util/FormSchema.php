@@ -338,9 +338,11 @@ class FormSchema {
                         $fData = $foreignModel->all();
 
                         // filtering method for defaults
-                        $fFilter = function($item) use ($defaults) {
+                        $fFilter = function($item) use ($defaults)
+                        {
                             $attrs = array_keys($item->getAttributes());
-                            foreach($this->defaults as $dkey => $dvalue) {
+                            foreach($this->defaults as $dkey => $dvalue)
+                            {
                                 //do we have this item in the model attributes - columns
                                 if (in_array($dkey, $attrs)) {
                                     if ($dvalue != $item->{$dkey}) {

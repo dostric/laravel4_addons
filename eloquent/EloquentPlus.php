@@ -163,47 +163,38 @@ class EloquentPlus extends EloquentModel {
         ];
     }
 
+
     public function getAngularRelations()
     {
         $relations = [];
-        $arrayableRelations = $this->getArrayableRelations();
 
-        if (count($arrayableRelations))
+        $fKeys = DbTools::fKeys($this->getTable()); // relation keys
+
+        foreach($fKeys as $local => $related)
         {
-            foreach($arrayableRelations as $relationName => $relationModel)
+            $relation = $this->{$related->table};
+            if ($relation)
             {
-                $current = $relationModel->getAngularArray();
+                $data = $relation->getAngularArray();
 
-                if ($relationModel instanceof AngularCollection)
+                $subRelations = $relation->getAngularRelations();
+
+                if (count($subRelations))
                 {
-                    $child = $relationModel->toAngular();
+                    $data = array_merge(
+                        $data,
+                        $subRelations
+                    );
                 }
 
-                else
-                {
-                    $child = $relationModel->getAngularRelations();
-                }
-
-                if ($child)
-                {
-                    $current = array_merge($current, $child);
-                }
-
-                $relations[$relationName] = $current;
+                $relations[$local] = $data;
 
             }
 
         }
 
-        else
-        {
-            return null;
-        }
-
         return $relations;
-
     }
-
 
     public function isSmallTable()
     {
