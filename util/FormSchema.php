@@ -67,7 +67,7 @@ class FormSchema {
     }
 
 
-    public function settings($what, $default)
+    public function settings($what, $default = null)
     {
         return
             array_key_exists($what, $this->settings) ? $this->settings[$what] : $default;

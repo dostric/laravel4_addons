@@ -25,9 +25,9 @@ class AngularCollection extends Collection {
             {
                 foreach($cRealtions as $cTable)
                 {
-                    if ($cRelation = $value->{$cTable})
+                    if ($value->hasRelation($cTable))
                     {
-                        $data[$cTable] = $cRelation->toAngular();
+                        $data[$cTable] = $value->{$cTable}->toAngular();
                         $schemaKeys[] = $cTable;
                     }
 
@@ -48,16 +48,14 @@ class AngularCollection extends Collection {
                 {
                     // does the relation exists
                     // if yes get its
-                    if ($relation = $value->{$foreign->table})
+                    if ($value->hasRelation($foreign->table))
                     {
-                        try {
-                            $data[$local] = array_merge(
-                                $relation->getAngularArray(),
-                                $relation->getAngularRelations()
-                            );
-                        } catch (\Exception $e) {
-                            exit('asdasd');
-                        }
+                        $relation = $value->{$foreign->table};
+
+                        $data[$local] = array_merge(
+                            $relation->getAngularArray(),
+                            $relation->getAngularRelations()
+                        );
 
                         $schemaKeys[] = $local; // do not delete this key if we need it in schema
                         unset($data[$foreign->table]);

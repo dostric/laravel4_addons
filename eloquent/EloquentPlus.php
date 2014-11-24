@@ -172,9 +172,10 @@ class EloquentPlus extends EloquentModel {
 
         foreach($fKeys as $local => $related)
         {
-            $relation = $this->{$related->table};
-            if ($relation)
+            if ($this->hasRelation($related->table))
             {
+                $relation = $this->{$related->table};
+
                 $data = $relation->getAngularArray();
 
                 $subRelations = $relation->getAngularRelations();
