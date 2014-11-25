@@ -25,9 +25,9 @@ class AngularCollection extends Collection {
             {
                 foreach($cRealtions as $cTable)
                 {
-                    if ($value->hasRelation($cTable) && ($relation = $value->{$cTable}))
+                    if ($value->hasRelation($cTable))
                     {
-                        if ($relation)
+                        if ($relation = $value->{$cTable})
                         {
                             $data[$cTable] = $relation->toAngular();
                             $schemaKeys[] = $cTable; // do not delete this key if we need it in schema
@@ -36,7 +36,7 @@ class AngularCollection extends Collection {
 
                     else
                     {
-                        \Log::warning('Custom relation does not exist! Relation: '.$cTable);
+                        //\Log::warning('Custom relation does not exist! Relation: '.$cTable);
                     }
                 }
             }
@@ -50,20 +50,24 @@ class AngularCollection extends Collection {
                 {
                     // does the relation exists
                     // if yes get its
-                    if ($value->hasRelation($foreign->table) && ($relation = $value->{$foreign->table}))
+                    if ($value->hasRelation($foreign->table))
                     {
-                        $data[$local] = array_merge(
-                            $relation->getAngularArray(),
-                            $relation->getAngularRelations()
-                        );
+                        if ($relation = $value->{$foreign->table})
+                        {
+                            $data[$local] = array_merge(
+                                $relation->getAngularArray(),
+                                $relation->getAngularRelations()
+                            );
 
-                        $schemaKeys[] = $local; // do not delete this key if we need it in schema
-                        unset($data[$foreign->table]);
+                            $schemaKeys[] = $local; // do not delete this key if we need it in schema
+                            unset($data[$foreign->table]);
+                        }
                     }
                 }
             }
 
-            if ($forSchema) {
+            if ($forSchema)
+            {
                 $data['text'] = $value->getTitle();
                 $data = array_intersect_key($data, array_flip($schemaKeys));
             }
