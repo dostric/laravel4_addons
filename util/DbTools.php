@@ -59,7 +59,7 @@ class DbTools {
      *
      * @param string $table
      * @param bool $fresh
-     * @return \Doctrine\DBAL\Schema\Column[]
+     * @return array
      */
     public static function getTableSchema($table, $fresh = false)
     {

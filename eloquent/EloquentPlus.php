@@ -1,6 +1,5 @@
 <?php namespace LaravelAddons\Eloquent;
 
-use Doctrine\DBAL\Query\QueryBuilder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Input;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
@@ -244,7 +243,7 @@ class EloquentPlus extends EloquentModel {
 
     /**
      * Retrieve the table schema. It is a non-cached version, object based.
-     * @return \Doctrine\DBAL\Schema\Column[]
+     * @return array
      */
     public static function getTableSchema()
     {
