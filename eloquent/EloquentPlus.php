@@ -173,24 +173,23 @@ class EloquentPlus extends EloquentModel {
         {
             if ($this->hasRelation($related->table))
             {
-                $relation = $this->{$related->table};
-
-                $data = $relation->getAngularArray();
-
-                $subRelations = $relation->getAngularRelations();
-
-                if (count($subRelations))
+                if ($relation = $this->{$related->table})
                 {
-                    $data = array_merge(
-                        $data,
-                        $subRelations
-                    );
+                    $data = $relation->getAngularArray();
+
+                    $subRelations = $relation->getAngularRelations();
+
+                    if (count($subRelations))
+                    {
+                        $data = array_merge(
+                            $data,
+                            $subRelations
+                        );
+                    }
+
+                    $relations[$local] = $data;
                 }
-
-                $relations[$local] = $data;
-
             }
-
         }
 
         return $relations;
@@ -656,8 +655,8 @@ class EloquentPlus extends EloquentModel {
                  */
                 $data = $query->get(); //var_dump($data->toArray());
 
-                foreach($data as $k => $model) {
-
+                foreach($data as $k => $model)
+                {
                     // did we joined the children
                     if ($this->combineTables)
                     {
@@ -670,7 +669,7 @@ class EloquentPlus extends EloquentModel {
                                 if (array_key_exists($defaultColumn, $foreignItem->getAttributes()))
                                 {
                                     // on the foreign table there is the default column?
-                                    if ($foreignItem->{$defaultColumn} != $defaultValue) {
+                                    if (false && $foreignItem->{$defaultColumn} != $defaultValue) {
                                         // there it is, but the value is invalid
                                         unset($data[$k]);
                                     }
@@ -678,14 +677,16 @@ class EloquentPlus extends EloquentModel {
                                     // we have the value and it is valid
                                     else
                                     {
-                                        $data[$k][$column] = [
-                                            'id' => $foreignItem->getId(),
-                                            'text' => $foreignItem->getTitle()
-                                        ];
-                                        unset($data[$k][$colData->table]);
+
                                     }
                                 }
                             }
+
+                            $data[$k][$column] = [
+                                'id' => $foreignItem->getId(),
+                                'text' => $foreignItem->getTitle()
+                            ];
+                            unset($data[$k][$colData->table]);
 
 
                         }
