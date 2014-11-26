@@ -620,6 +620,35 @@ class EloquentPlus extends EloquentModel {
                 foreach($foreignKeys as $column => $colData)
                 {
                     // combine local table with foreign and filter foreign table with defaults
+                    $query->with($colData->table);
+
+                    $query->whereHas($colData->table, function ($subQuery) use ($table, $colData, $defaults) {
+
+                        if (count($defaults))
+                        {
+                            // get the foreign table schema; prefix the keys with table name and a dot
+                            $foreignSchema = \Mars\Util\array_prefix_key(
+                                DbTools::getTableSchema($colData->table),
+                                $colData->table . '.',
+                                false
+                            );
+
+                            if (count($foreignSchema))
+                            {
+                                foreach($defaults as $defaultColumn => $defaultValue)
+                                {
+                                    // check if the key exists - apply if found
+                                    if (array_key_exists($defaultColumn, $foreignSchema))
+                                    {
+                                        $subQuery->where($colData->table . '.' . $defaultColumn, $defaultValue);
+                                    }
+                                }
+                            }
+                        }
+
+                    });
+
+                    /*
                     $query->with([$colData->table => function($theQuery) use ($table, $colData, $defaults) {
 
                         // apply defaults for non cached query
@@ -646,6 +675,7 @@ class EloquentPlus extends EloquentModel {
                         }
 
                     }]);
+                    */
 
                 }
 
@@ -673,31 +703,32 @@ class EloquentPlus extends EloquentModel {
                         // iterate children
                         foreach($foreignKeys as $column => $colData)
                         {
-                            $foreignItem = $model->{$colData->table};
-                            foreach($defaults as $defaultColumn => $defaultValue)
+                            if ($foreignItem = $model->{$colData->table})
                             {
-                                if (array_key_exists($defaultColumn, $foreignItem->getAttributes()))
+                                foreach($defaults as $defaultColumn => $defaultValue)
                                 {
-                                    // on the foreign table there is the default column?
-                                    if (false && $foreignItem->{$defaultColumn} != $defaultValue) {
-                                        // there it is, but the value is invalid
-                                        unset($data[$k]);
-                                    }
-
-                                    // we have the value and it is valid
-                                    else
+                                    if (array_key_exists($defaultColumn, $foreignItem->getAttributes()))
                                     {
+                                        // on the foreign table there is the default column?
+                                        if (false && $foreignItem->{$defaultColumn} != $defaultValue) {
+                                            // there it is, but the value is invalid
+                                            unset($data[$k]);
+                                        }
 
+                                        // we have the value and it is valid
+                                        else
+                                        {
+
+                                        }
                                     }
                                 }
+
+                                $data[$k][$column] = [
+                                    'id' => $foreignItem->getId(),
+                                    'text' => $foreignItem->getTitle()
+                                ];
+                                unset($data[$k][$colData->table]);
                             }
-
-                            $data[$k][$column] = [
-                                'id' => $foreignItem->getId(),
-                                'text' => $foreignItem->getTitle()
-                            ];
-                            unset($data[$k][$colData->table]);
-
 
                         }
                     }
