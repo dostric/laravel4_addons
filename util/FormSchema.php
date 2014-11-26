@@ -25,6 +25,9 @@ class FormSchema {
     protected $searchFields;
 
 
+    /**
+     * @var null|array
+     */
     protected $defaults;
 
     /**
@@ -464,20 +467,14 @@ class FormSchema {
         {
             $titleKey = 'db::'.$this->table.'.'.$column;
 
-            $out[$column] = array(
+            $out[$column] = [
                 'title'         => \Lang::has($titleKey) ? \Lang::get($titleKey) : $column,
                 'showInTable'   => array_key_exists($column, $gridFields),
                 'showInEdit'    => $column == 'id' ? 'disabled' : array_key_exists($column, $editFields),
                 'showInCreate'  => $column == 'id' ? false : array_key_exists($column, $editFields),
                 'showInSearch'  => array_key_exists($column, $searchFields),
                 'formSettings'  => $this->getWidgetType($column)
-                /*
-                //combobox
-                    -> autocomplete default false, stavi true ako ih je puno
-                    -> multi true, ako zelis multi multi_select
-                    -> source array stringova ili objekta { label, value } ili string remoteurl
-                */
-            );
+            ];
         }
 
         return $out;
