@@ -22,6 +22,8 @@ class EloquentPlus extends EloquentModel {
 
     public $smallTable = false;
 
+    public $timestamps = false;
+
 
     public $combineTables = true;
 
