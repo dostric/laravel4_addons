@@ -278,6 +278,34 @@ class FormSchema {
     }
 
 
+    protected static function getSchemaCacheKey($id, $defaults, $settings)
+    {
+        return $id . '_' . md5(serialize($defaults) . serialize($settings));
+    }
+
+    public static function getSchemaCache($id, $defaults, $settings)
+    {
+        $key = static::getSchemaCacheKey($id, $defaults, $settings);
+
+        return \Cache::tags('schema_cache_'.$id)->get($key, null);
+    }
+
+    public static function setSchemaCache($id, $defaults, $settings, $value)
+    {
+        $key = static::getSchemaCacheKey($id, $defaults, $settings);
+
+        \Cache::tags('schema_cache_'.$id)->forever($key, $value);
+    }
+
+
+
+    public static function forgetSchema($id)
+    {
+        \Cache::tags('schema_cache_'.$id)->flush();
+    }
+
+
+
     public function getWidgetType($column) {
 
         $lang = \App::getLocale();

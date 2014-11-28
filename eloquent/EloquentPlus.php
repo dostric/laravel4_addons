@@ -8,6 +8,7 @@ use \DB;
 use LaravelAddons\Util\AngularCollection;
 use LaravelAddons\Util\Tools;
 use LaravelAddons\Util\DbTools;
+use Mars\Util\FormSchemaAngular;
 
 
 class EloquentPlus extends EloquentModel {
@@ -563,14 +564,6 @@ class EloquentPlus extends EloquentModel {
             }
         }
 
-        $modelWith = array();
-        if ($this->combineTables)
-        {
-            foreach($foreignKeys as $column => $colData)
-            {
-                $modelWith[] = $colData->table;
-            }
-        }
 
         try {
 
@@ -616,11 +609,18 @@ class EloquentPlus extends EloquentModel {
             // do we need foreign tables - speed up search queries if foreign table data is not important
             if ($this->combineTables)
             {
+                //echo "Table $table<br>";
+                //$this->combineForeignTables($query, $table, $defaults);
+
+                $relations = [];
+                FormSchemaAngular::laravelRelations($relations, $table);
+
+
                 // iterate local foreign keys
                 foreach($foreignKeys as $column => $colData)
                 {
                     // combine local table with foreign and filter foreign table with defaults
-                    $query->with($colData->table);
+                    $query->with($relations);
 
                     $query->whereHas($colData->table, function ($subQuery) use ($table, $colData, $defaults) {
 
@@ -648,35 +648,6 @@ class EloquentPlus extends EloquentModel {
 
                     });
 
-                    /*
-                    $query->with([$colData->table => function($theQuery) use ($table, $colData, $defaults) {
-
-                        // apply defaults for non cached query
-                        if (count($defaults))
-                        {
-                            // get the foreign table schema; prefix the keys with table name and a dot
-                            $foreignSchema = \Mars\Util\array_prefix_key(
-                                DbTools::getTableSchema($colData->table),
-                                $colData->table . '.',
-                                false
-                            );
-
-                            if (count($foreignSchema))
-                            {
-                                foreach($defaults as $defaultColumn => $defaultValue)
-                                {
-                                    // check if the key exists - apply if found
-                                    if (array_key_exists($defaultColumn, $foreignSchema))
-                                    {
-                                        $theQuery->where($colData->table . '.' . $defaultColumn, $defaultValue);
-                                    }
-                                }
-                            }
-                        }
-
-                    }]);
-                    */
-
                 }
 
             }
@@ -688,54 +659,9 @@ class EloquentPlus extends EloquentModel {
             $total = DbTools::$sqlTotalRows = 0;
 
             try {
-                /**
-                 * @var \Illuminate\Database\Query\Builder $query
-                 * @var \Illuminate\Database\Eloquent\Collection $data
-                 * @var EloquentPlus $foreignItem
-                 */
                 $data = $query->get(); //var_dump($data->toArray());
 
-                foreach($data as $k => $model)
-                {
-                    // did we joined the children
-                    if ($this->combineTables)
-                    {
-                        // iterate children
-                        foreach($foreignKeys as $column => $colData)
-                        {
-                            if ($foreignItem = $model->{$colData->table})
-                            {
-                                foreach($defaults as $defaultColumn => $defaultValue)
-                                {
-                                    if (array_key_exists($defaultColumn, $foreignItem->getAttributes()))
-                                    {
-                                        // on the foreign table there is the default column?
-                                        if (false && $foreignItem->{$defaultColumn} != $defaultValue) {
-                                            // there it is, but the value is invalid
-                                            unset($data[$k]);
-                                        }
-
-                                        // we have the value and it is valid
-                                        else
-                                        {
-
-                                        }
-                                    }
-                                }
-
-                                $data[$k][$column] = [
-                                    'id' => $foreignItem->getId(),
-                                    'text' => $foreignItem->getTitle()
-                                ];
-                                unset($data[$k][$colData->table]);
-                            }
-
-                        }
-                    }
-                }
-
-
-                $result = $data->toArray();
+                $result = $data->toAngular();
 
                 // check if we need to manualy get the count
                 if (DbTools::$sqlTotalRows == 'get')
@@ -744,27 +670,23 @@ class EloquentPlus extends EloquentModel {
                 }
 
                 $total = Tools::is_pdigit(DbTools::$sqlTotalRows) ? DbTools::$sqlTotalRows : 0;
-
             }
 
             catch (\Exception $e)
             {
-                $data = array();
+                $result = array();
 
                 $errors[] = $debug ?
                     'Error fetching data.' :
                     $e->getMessage() . ' Query: '.$query->toSql();
-
             }
 
-
-
-
             //var_dump($data->toArray());
-            //exit('hjghj');
 
-        } catch (\Exception $e) {
+        }
 
+        catch (\Exception $e)
+        {
             $total = 0;
 
             $result = array();
@@ -772,8 +694,6 @@ class EloquentPlus extends EloquentModel {
             $errors[] = $debug ?
                 'Error fetching data.' :
                 $e->getMessage() . ' at ' . $e->getFile() . ' line ' . $e->getLine();
-
-            var_dump($e->toArray());
         }
 
         if (count($errors))
@@ -787,11 +707,44 @@ class EloquentPlus extends EloquentModel {
 
 
     /**
+     * METHOD TO DO NOT used for now.
+     * @param $query
+     * @param string $table This is the local table
+     * @param $defaults
+     */
+    protected function combineForeignTables($query, $table, $defaults)
+    {
+        $relations = [];
+        FormSchemaAngular::laravelRelations($relations, $table);
+
+        if ($this->isSmallTable())
+        {
+            $currentPath = $table;
+
+            $foreignKeys = DbTools::fKeys($table); print_r($foreignKeys);
+
+            foreach($foreignKeys as $column => $colData)
+            {
+                $currentPath .= '.' . $colData->table;
+
+                $this->combineForeignTables($query, $colData->table, $defaults);
+
+            }
+
+            echo $currentPath. "<br>\n";
+
+
+        }
+    }
+
+
+    /**
      * Get the model rules.
      *
      * @return array
      */
-    public static function getRules() {
+    public static function getRules()
+    {
         return static::$rules;
     }
 
@@ -800,17 +753,17 @@ class EloquentPlus extends EloquentModel {
      * @param array $data
      * @return \Illuminate\Validation\Validator
      */
-    public function validator(array $data = null) {
-
+    public function validator(array $data = null)
+    {
         return
             $data === null ?
                 $this->validator :
                 ($this->validator = \Validator::make($data, static::$rules));
-
     }
 
 
-    public static function filterModelKeys($data) {
+    public static function filterModelKeys($data)
+    {
         return array_intersect_key(
             $data,
             static::getTableSchema()

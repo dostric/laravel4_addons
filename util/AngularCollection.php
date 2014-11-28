@@ -20,7 +20,8 @@ class AngularCollection extends Collection {
             $data = $value->toArray();
             $schemaKeys = ['id', 'text'];
 
-            // fix custom relations
+
+            // iterate custom relations
             if (count($cRealtions = $value->getCustomRelations()))
             {
                 foreach($cRealtions as $cTable)
@@ -33,17 +34,12 @@ class AngularCollection extends Collection {
                             $schemaKeys[] = $cTable; // do not delete this key if we need it in schema
                         }
                     }
-
-                    else
-                    {
-                        //\Log::warning('Custom relation does not exist! Relation: '.$cTable);
-                    }
                 }
             }
 
 
+            // iterate foreign relations
             $fKeys = DbTools::fKeys($value->getTable());
-
             foreach($fKeys as $local => $foreign)
             {
                 if (array_key_exists($foreign->table, $data))
@@ -66,6 +62,8 @@ class AngularCollection extends Collection {
                 }
             }
 
+
+            // for the schema part add the text and discard unnecessary data
             if ($forSchema)
             {
                 $data['text'] = $value->getTitle();
