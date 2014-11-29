@@ -1,20 +1,12 @@
 <?php namespace LaravelAddons\Util;
 
+
 use LaravelAddons\Eloquent\EloquentPlus;
-use LaravelAddons\Util\DbTools;
 
 
-class FormSchema {
-
-    /**
-     * @var EloquentPlus
-     */
-    protected $model;
-
-    protected $table;
+abstract class FormSchema {
 
     protected $schema;
-
 
     protected $dataFields;
 
@@ -24,9 +16,8 @@ class FormSchema {
 
     protected $searchFields;
 
-
     /**
-     * @var null|array
+     * @var array
      */
     protected $defaults;
 
@@ -36,37 +27,20 @@ class FormSchema {
     protected $settings;
 
 
-    public function __construct(EloquentPlus $model, $defaults = null, array $settings = null)
+    public function __construct(array $defaults = null, array $settings = null)
     {
-        $this->model = $model;
-        $this->table = $model->getTable();
+        // set default schema
+        $this->schema = [];
 
-        // fetch the schema; schema is cached
-        $this->schema = DbTools::getFormSchema($this->table);
+        // set default form fields
+        $this->searchFields = $this->dataFields = $this->gridFields = $this->editFields = [];
 
-        // we`ll add all fields by default
-        $this->dataFields = $this->gridFields = $this->editFields = array_keys($this->schema);
-
-        // we`ll remove timestamps by default
-        $this->removeEditFields(array('created_at', 'updated_at', 'deleted_at'));
-        $this->removeGridFields(array('id', 'created_at', 'updated_at', 'deleted_at'));
-
-        $this->searchFields = array();
-
-        $this->defaults = $defaults;
+        $this->defaults = $defaults ?: [];
 
         $this->settings = $settings ?: [];
 
-        if (!array_key_exists('schema_recursive', $this->settings)) {
-            $this->settings['schema_recursive'] = '*';
-        }
-
-    }
-
-
-    public static function make(EloquentPlus $model, $defaults = null, array $settings = null)
-    {
-        return new static($model, $defaults, $settings);
+        // set default recursion to all fields
+        $this->settings['schema_recursive'] = $this->settings('schema_recursive', '*');
     }
 
 
@@ -235,48 +209,9 @@ class FormSchema {
         $this->removeFields('searchFields', $fields);
     }
 
-    protected function createFormRules($rules = '') {
 
-        $newRules = array();
-        if ($rules) {
 
-            $rules = explode('|', $rules); //var_dump($rules); exit();
-            foreach($rules as $rule) {
-
-                if ($rule) {
-
-                    @list($name, $value) = explode(':', $rule, 2);
-
-                    //$t = explode(':', $rule, 2);
-                    //var_dump($t); continue;
-
-                    switch ($name) {
-
-                        case 'email':
-                            $newRules[] = "email";
-                            break;
-
-                        case 'url':
-                            $newRules[] = "url";
-                            break;
-
-                        case 'size':
-                            $newRules[] = "length:$value";
-                            break;
-
-                    }
-
-                }
-
-            }
-
-        }
-
-        return $newRules;
-        //return json_encode($newRules, JSON_PRETTY_PRINT);
-
-    }
-
+    # CACHING PART
 
     protected static function getSchemaCacheKey($id, $defaults, $settings)
     {
@@ -297,174 +232,27 @@ class FormSchema {
         \Cache::tags('schema_cache_'.$id)->forever($key, $value);
     }
 
-
-
     public static function forgetSchema($id)
     {
         \Cache::tags('schema_cache_'.$id)->flush();
     }
 
-
-
-    public function getWidgetType($column) {
-
-        $lang = \App::getLocale();
-
-        $fKeys = DbTools::fKeys($this->table);
-        $fData = null;
-
-        $data = array();
-
-        $columnRules = $this->model->getRules();
-
-        if ($columnRules && array_key_exists($column, $columnRules)) {
-            $columnRules = $this->createFormRules($columnRules[$column]);
-        } else {
-            $columnRules = null;
-        }
-        //var_dump($columnRules);
-
-
-        if ($this->schema && array_key_exists($column, $this->schema))
-        {
-            $colData = $this->schema[$column];
-
-            $data = array(
-                'widget' => null,
-                'defaultValue' => addslashes($colData['default']),
-                'required' => $colData['null'] ? false : true,
-                'validate' => $columnRules
-            );
-
-            $multi = false;
-
-            // check the foreign key column
-            if (array_key_exists($column, $fKeys) && ($fk = $fKeys[$column]))
-            {
-                /**
-                 * @var EloquentPlus $foreignModel
-                 */
-                //DbTools::getTableSchema($fk->table, true);
-                //var_dump($this->model->with($fk->table)->get()->toArray());
-                //var_dump($fk->table, DbTools::getFormSchema($fk->table, true));
-
-                $defaults = $this->defaults;
-
-                $foreignModel = DbTools::detectModelClassByTable($fk->table);
-
-                if ( $foreignModel && ($foreignModel = new $foreignModel) )
-                {
-                    // for large tables use ajax requests
-                    if ( $foreignModel->count() > 1000 )
-                    {
-                        $fData = \URL::action(
-                            ucwords($fk->table).'Controller@index'
-                        );
-                    }
-
-                    // build the foreign table data
-                    else
-                    {
-                        // all foreign table records
-                        $fData = $foreignModel->all();
-
-                        // filtering method for defaults
-                        $fFilter = function($item) use ($defaults)
-                        {
-                            $attrs = array_keys($item->getAttributes());
-                            foreach($this->defaults as $dkey => $dvalue)
-                            {
-                                //do we have this item in the model attributes - columns
-                                if (in_array($dkey, $attrs)) {
-                                    if ($dvalue != $item->{$dkey}) {
-                                        return null;
-                                    }
-                                }
-                                else
-                                {
-                                    return false;
-                                }
-                            }
-                            return true;
-                        };
-
-                        // if we have the defaults key in the foreign table - filter the
-                        if (($fOne = $fData->first()) && $fFilter($fOne)) {
-                            $fData = $fData->filter($fFilter);
-                        }
-
-                        $fData = $fData->map(function(EloquentPlus $item) {
-                            return [
-                                'id' => $item->getId(),
-                                'title' => $item->getTitle()
-                            ];
-                        });
-
-                        //$fData = \DB::table($fk->table)->select('id as value', 'name as label')->get();
-                    }
-
-                    $data['widget'] = array(
-                        'combobox',
-                        array(
-                            'multi' => false,
-                            'source' => $fData,
-                            'allowClear' => $colData['null'] ? true : false
-                        )
-                    );
-
-                    return $data;
-                }
-                else
-                {
-                    // error detecting model
-                    return [];
-                }
-            }
+    # CACHING END
 
 
 
-            switch($this->schema[$column]['type']) {
+    abstract public function getTitle($key);
 
-                case 'decimal': case 'float': case 'double':
-                $data['validate'][] = 'number';
-                break;
+    abstract public function showInTable($column, $data);
 
-                case 'text':
-                    $data['widget'] = array('textarea');
-                    break;
+    abstract public function showInEdit($column, $data);
 
-                case 'integer':
-                    $data['validate'][] = 'digits';
-                    break;
+    abstract public function showInCreate($column, $data);
 
-                case 'decimal':
-                    $data['validate'][] = 'number';
-                    break;
+    abstract public function showInSearch($column, $data);
 
-                case 'set':
-                    $multi = true;
+    abstract public function getWidgetType($widget);
 
-                case 'enum':
-                    $data['widget'] = array(
-                        'combobox',
-                        array(
-                            'multi' => $multi
-                        )
-                    );
-                    break;
-
-                case 'date':
-                case 'datetime':
-                    $data['widget'] = array('datepicker'); // array(name, array(config))
-                    break;
-
-            }
-
-        }
-
-        return $data;
-
-    }
 
 
     /**
@@ -493,14 +281,12 @@ class FormSchema {
         $out = array();
         foreach($this->schema as $column => $data)
         {
-            $titleKey = 'db::'.$this->table.'.'.$column;
-
             $out[$column] = [
-                'title'         => \Lang::has($titleKey) ? \Lang::get($titleKey) : $column,
-                'showInTable'   => array_key_exists($column, $gridFields),
-                'showInEdit'    => $column == 'id' ? 'disabled' : array_key_exists($column, $editFields),
-                'showInCreate'  => $column == 'id' ? false : array_key_exists($column, $editFields),
-                'showInSearch'  => array_key_exists($column, $searchFields),
+                'title'         => $this->getTitle($column),
+                'showInTable'   => $this->showInTable($column, $gridFields),
+                'showInEdit'    => $this->showInEdit($column, $editFields),
+                'showInCreate'  => $this->showInCreate($column, $editFields),
+                'showInSearch'  => $this->showInSearch($column, $searchFields),
                 'formSettings'  => $this->getWidgetType($column)
             ];
         }
