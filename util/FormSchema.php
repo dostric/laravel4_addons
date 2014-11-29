@@ -1,12 +1,17 @@
 <?php namespace LaravelAddons\Util;
 
 
-use LaravelAddons\Eloquent\EloquentPlus;
+use Mars\Rs\Classes\DescriptionForm;
 
 
 abstract class FormSchema {
 
+    /**
+     * @var DescriptionForm|array
+     */
     protected $schema;
+
+    protected $language;
 
     protected $dataFields;
 
@@ -31,6 +36,8 @@ abstract class FormSchema {
     {
         // set default schema
         $this->schema = [];
+
+        $this->language = \App::getLocale();
 
         // set default form fields
         $this->searchFields = $this->dataFields = $this->gridFields = $this->editFields = [];
@@ -258,14 +265,15 @@ abstract class FormSchema {
     /**
      * Create the form representation.
      *
+     * @param string $cacheKey
      * @return array
      */
-    public function fetch()
+    public function fetch($cacheKey = null)
     {
-        foreach(array('dataFields', 'gridFields', 'editFields', 'searchFields') as $entity)
+        foreach(['dataFields', 'gridFields', 'editFields', 'searchFields'] as $entity)
         {
             $$entity = array_intersect_key(
-                $this->schema,
+                is_array($this->schema) ? $this->schema : $this->schema->toArray(),
                 array_combine(
                     $this->{$entity},
                     $this->{$entity}
@@ -273,25 +281,33 @@ abstract class FormSchema {
             );
         }
 
-        /**
-         * @var array $gridFields
-         * @var array $editFields
-         * @var array $searchFields
-         */
-        $out = array();
-        foreach($this->schema as $column => $data)
+        // are we using cache
+        $result = $cacheKey ? self::getSchemaCache($cacheKey, $this->defaults, $this->settings) : null;
+
+        // did we used the cache and found the result
+        if (is_null($result))
         {
-            $out[$column] = [
-                'title'         => $this->getTitle($column),
-                'showInTable'   => $this->showInTable($column, $gridFields),
-                'showInEdit'    => $this->showInEdit($column, $editFields),
-                'showInCreate'  => $this->showInCreate($column, $editFields),
-                'showInSearch'  => $this->showInSearch($column, $searchFields),
-                'formSettings'  => $this->getWidgetType($column)
-            ];
+            /**
+             * @var array $gridFields
+             * @var array $editFields
+             * @var array $searchFields
+             */
+            $result = array();
+            foreach($this->schema as $column => $data) {
+                $result[$column] = [
+                    'title'        => $this->getTitle($column),
+                    'showInTable'  => $this->showInTable($column, $gridFields),
+                    'showInEdit'   => $this->showInEdit($column, $editFields),
+                    'showInCreate' => $this->showInCreate($column, $editFields),
+                    'showInSearch' => $this->showInSearch($column, $searchFields),
+                    'attrs'        => $this->getWidgetType($column)
+                ];
+            }
+
+            if ($cacheKey) self::setSchemaCache($cacheKey, $this->defaults, $this->settings, $result);
         }
 
-        return $out;
+        return $result;
     }
 
 

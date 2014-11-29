@@ -281,6 +281,11 @@ class FormSchemaEloquent extends FormSchema {
     }
 
 
+    public function fetch()
+    {
+        // we are using cache - the key is the table name
+        return parent::fetch($this->table);
+    }
 
 }
 
