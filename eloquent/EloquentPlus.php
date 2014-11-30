@@ -152,6 +152,11 @@ class EloquentPlus extends EloquentModel {
                 return $attr['name'];
             }
 
+            elseif (array_key_exists('value_'.$lang, $attr))
+            {
+                return $attr['value_'.$lang];
+            }
+
             // we did not find the name
             return null;
         }
