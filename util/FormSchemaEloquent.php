@@ -118,7 +118,7 @@ class FormSchemaEloquent extends FormSchema {
 
     public function showInEdit($column, $fields)
     {
-        return $column == 'id' ? 'disabled' : array_key_exists($column, $fields);
+        return $column == 'id' ? false : array_key_exists($column, $fields);
     }
 
     public function showInCreate($column, $fields)
