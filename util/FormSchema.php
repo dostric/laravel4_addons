@@ -295,12 +295,12 @@ abstract class FormSchema {
             $result = array();
             foreach($this->schema as $column => $data) {
                 $result[$column] = [
-                    'label'        => $this->getTitle($column),
-                    'showInTable'  => $this->showInTable($column, $gridFields),
-                    'showInEdit'   => $this->showInEdit($column, $editFields),
-                    'showInCreate' => $this->showInCreate($column, $editFields),
-                    'showInSearch' => $this->showInSearch($column, $searchFields),
-                    'attrs'        => $this->getWidgetType($column)
+                    'label'         => $this->getTitle($column),
+                    'showInGrid'    => $this->showInTable($column, $gridFields),
+                    'showInEdit'    => $this->showInEdit($column, $editFields),
+                    'showInCreate'  => $this->showInCreate($column, $editFields),
+                    'showInSearch'  => $this->showInSearch($column, $searchFields),
+                    'attrs'         => $this->getWidgetType($column)
                 ];
             }
 

@@ -37,8 +37,8 @@ class FormSchemaEloquent extends FormSchema {
         $this->dataFields = $this->gridFields = $this->editFields = array_keys($this->schema);
 
         // we`ll remove timestamps by default
-        $this->removeEditFields(array('created_at', 'updated_at', 'deleted_at'));
-        $this->removeGridFields(array('id', 'created_at', 'updated_at', 'deleted_at'));
+        $this->removeEditFields(['created_at', 'updated_at', 'deleted_at', 'timestampUpdated', 'timestampCreated']);
+        $this->removeGridFields(['created_at', 'updated_at', 'deleted_at', 'timestampUpdated', 'timestampCreated']);
 
         // remove primary keys from grid and edit
         $this->removeGridField($model->getKeyName());
