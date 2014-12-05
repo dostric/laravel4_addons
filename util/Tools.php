@@ -95,7 +95,11 @@ class Tools {
     }
 
 
-    public static function filter_pdigit_array($data)
+    /**
+     * @param array $data
+     * @return array
+     */
+    public static function filter_pdigit_array(array $data)
     {
         foreach($data as $k => $item)
         {
@@ -105,6 +109,10 @@ class Tools {
     }
 
 
+    /**
+     * @param $data
+     * @return array
+     */
     public static function filter_pdigit_csv($data)
     {
         $data = explode(',', $data);
