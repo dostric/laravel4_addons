@@ -66,25 +66,29 @@ class EloquentPlus extends EloquentModel {
     protected $schema;
 
 
+
     public static function make()
     {
         return new static();
     }
 
-    public function toAngular()
+
+    public function toAngular($forSchema = false)
     {
         $data = $this->toArray();
+        $schemaKeys = ['id', 'text'];
 
         // iterate custom relations
-        if (count($cr = $this->getCustomRelations()))
+        if (count($customRelations = $this->getCustomRelations()))
         {
-            foreach($cr as $relationName)
+            foreach($customRelations as $relationName)
             {
                 if ($this->hasRelation($relationName))
                 {
                     if ($relation = $this->{$relationName})
                     {
                         $data[$relationName] = $relation->toAngular();
+                        $schemaKeys[] = $relationName; // do not delete this key if we need it in schema
                     }
                 }
             }
@@ -97,16 +101,29 @@ class EloquentPlus extends EloquentModel {
             if (array_key_exists($foreign->table, $data))
             {
                 // does the relation exists
-                if ($relationName = $this->{$foreign->table})
+                // if yes get its relations
+                if ($this->hasRelation($foreign->table))
                 {
-                    $angularRelations = $relationName->getAngularRelations();
-                    $data[$local] = array_merge(
-                        $relationName->getAngularArray(),
-                        is_array($angularRelations) ? $angularRelations : []
-                    );
-                    unset($data[$foreign->table]);
+                    if ($relation = $this->{$foreign->table})
+                    {
+                        $data[$local] = array_merge(
+                            $relation->getAngularArray(),
+                            $relation->getAngularRelations()
+                        );
+
+                        $schemaKeys[] = $local; // do not delete this key if we need it in schema
+                        unset($data[$foreign->table]);
+                    }
                 }
+
             }
+        }
+
+        // for the schema part add the text and discard unnecessary data
+        if ($forSchema)
+        {
+            $data['text'] = $this->getTitle();
+            $data = array_intersect_key($data, array_flip($schemaKeys));
         }
 
         return $data;
@@ -124,11 +141,7 @@ class EloquentPlus extends EloquentModel {
      */
     public function getId()
     {
-        if ($this->exists)
-        {
-            return $this->{$this->primaryKey};
-        }
-        return null;
+        return $this->exists ? $this->{$this->primaryKey} : null;
     }
 
     /**
@@ -179,6 +192,9 @@ class EloquentPlus extends EloquentModel {
     }
 
 
+    /**
+     * @return array
+     */
     public function getAngularRelations()
     {
         $relations = [];
@@ -211,10 +227,12 @@ class EloquentPlus extends EloquentModel {
         return $relations;
     }
 
+
     public function isSmallTable()
     {
         return $this->smallTable && (self::cachedCount() < $this->smallTableRows);
     }
+
 
     public static function onMaster($name = null)
     {
@@ -222,6 +240,7 @@ class EloquentPlus extends EloquentModel {
             $name ?: \Config::get('database.default-master')
         );
     }
+
 
     /**
      * Adding support for generating model collections using the primary key as collection key.

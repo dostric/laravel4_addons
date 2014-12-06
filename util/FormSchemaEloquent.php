@@ -259,11 +259,10 @@ class FormSchemaEloquent extends FormSchema {
                 $multi = true;
 
             case 'enum':
-                $data['widget'] = array(
-                    'combobox',
-                    array(
-                        'multi' => $multi
-                    )
+                $data['uiSelect2'] = array(
+                    'multiple' => false,
+                    'data' => [],
+                    'allowClear' => true
                 );
                 break;
 
