@@ -11,7 +11,7 @@ class AngularCollection extends Collection {
     {
         return array_values(array_map(function($value) use ($forSchema)
         {
-            return $value->toAngular();
+            return $value->toAngular($forSchema);
 
         }, $this->items));
     }

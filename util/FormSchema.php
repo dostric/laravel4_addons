@@ -285,7 +285,7 @@ abstract class FormSchema {
         $result = $cacheKey ? self::getSchemaCache($cacheKey, $this->defaults, $this->settings) : null;
 
         // did we used the cache and found the result
-        if (is_null($result))
+        if (true || is_null($result))
         {
             /**
              * @var array $gridFields
