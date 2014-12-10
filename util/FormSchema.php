@@ -285,7 +285,7 @@ abstract class FormSchema {
         $result = $cacheKey ? self::getSchemaCache($cacheKey, $this->defaults, $this->settings) : null;
 
         // did we used the cache and found the result
-        if (is_null($result))
+        if (true || is_null($result))
         {
             /**
              * @var array $gridFields
@@ -299,9 +299,14 @@ abstract class FormSchema {
                     'showInGrid'    => $this->showInTable($column, $gridFields),
                     'showInEdit'    => $this->showInEdit($column, $editFields),
                     'showInCreate'  => $this->showInCreate($column, $editFields),
-                    'showInSearch'  => $this->showInSearch($column, $searchFields),
-                    'attrs'         => $this->getWidgetType($column)
+                    'showInSearch'  => $this->showInSearch($column, $searchFields)
+
                 ];
+
+                $result[$column] = array_merge(
+                    $result[$column],
+                    $this->getWidgetType($column)
+                );
             }
 
             if ($cacheKey) self::setSchemaCache($cacheKey, $this->defaults, $this->settings, $result);

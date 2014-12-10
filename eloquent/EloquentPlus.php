@@ -73,6 +73,29 @@ class EloquentPlus extends EloquentModel {
     }
 
 
+    /**
+     * Handles loading of custom relations.
+     *
+     * @param array|string $relations
+     * @return $this
+     */
+    public function load($relations)
+    {
+        if (is_string($relations)) $relations = func_get_args();
+
+        foreach($relations as $k => $relation)
+        {
+            if (in_array($relation, $this->getCustomRelations()))
+            {
+                $this->setRelation($relation, $this->{$relation}());
+                unset($relations[$k]);
+            }
+        }
+
+        return parent::load($relations);
+    }
+
+
     public function toAngular($forSchema = false)
     {
         $data = $this->toArray();
@@ -87,8 +110,11 @@ class EloquentPlus extends EloquentModel {
                 {
                     if ($relation = $this->{$relationName})
                     {
-                        $data[$relationName] = $relation->toAngular();
-                        $schemaKeys[] = $relationName; // do not delete this key if we need it in schema
+                        if ($relation instanceof AngularCollection)
+                        {
+                            $data[$relationName] = $relation->toAngular();
+                            $schemaKeys[] = $relationName; // do not delete this key if we need it in schema
+                        }
                     }
                 }
             }
