@@ -874,16 +874,14 @@ class EloquentPlus extends EloquentModel {
         // we`ll switch the connection to the master and reset it after the update
         DB::setDefaultConnection(\Config::get('database.default-master'));
 
-        \Log::info(
-            'model->save() ' . $this->getTable() . ' sa ' . print_r($this->getAttributes(), true)
-        );
-
         $saved = parent::save($options);
 
         DB::setDefaultConnection(DB::getDefaultConnection());
 
-        if ($saved === true)
+        if ($saved === true && $this->isSmallTable())
         {
+            \Log::info('model->save() ' . $this->getTable() . ' sa ' . print_r($this->getAttributes(), true));
+
             $this->deleteSmallTableCache();
 
             \Log::info('model->save() related je: ' . implode(', ', $this->related()));
