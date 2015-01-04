@@ -1,7 +1,9 @@
 <?php namespace LaravelAddons\Util;
 
+
 use Illuminate\Database\Eloquent\Collection;
 use LaravelAddons\Eloquent\EloquentPlus;
+
 
 class AngularCollection extends Collection {
 

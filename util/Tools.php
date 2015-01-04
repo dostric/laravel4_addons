@@ -29,6 +29,14 @@ class Tools {
 
     public static function is_pdigit($str)
     {
+        if (func_num_args()>1)
+        {
+            foreach(func_num_args() as $arg)
+            {
+                if (! self::is_pdigit($arg)) return false;
+            }
+            return true;
+        }
         return (ctype_digit((string)$str) && $str>=0);
     }
 
